@@ -26,26 +26,26 @@ using namespace std;
 
 struct Optimiser
 {
-	//data
-	vector<real_t>& wts;
-	vector<real_t>& derivs;
-	
-	//functions
-	Optimiser(vector<real_t>& weights, vector<real_t>& derivatives):
-		wts(weights),
-		derivs(derivatives)
-	{
-	}
-	virtual ~Optimiser(){}
-	virtual void update_weights() = 0;
-	virtual void print(ostream& out = cout) const = 0;
-	virtual void build() = 0;
+    //data
+    vector<real_t>& wts;
+    vector<real_t>& derivs;
+    
+    //functions
+    Optimiser(vector<real_t>& weights, vector<real_t>& derivatives):
+        wts(weights),
+        derivs(derivatives)
+    {
+    }
+    virtual ~Optimiser(){}
+    virtual void update_weights() = 0;
+    virtual void print(ostream& out = cout) const = 0;
+    virtual void build() = 0;
 };
 
 ostream& operator << (ostream& out, const Optimiser& o)
 {
-	o.print(out);
-	return out;
+    o.print(out);
+    return out;
 }
 
 #endif

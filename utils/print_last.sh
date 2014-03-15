@@ -17,10 +17,10 @@
 
 if [ $# == 1 ]
 then
-	log_file=$1
-	max_epoch_lines=5000
-	tail -n ${max_epoch_lines} ${log_file} | tac | grep -m1 -A 3 -B ${max_epoch_lines} "train errors" | tac
+    log_file=$1
+    max_epoch_lines=5000
+    tail -n ${max_epoch_lines} ${log_file} | tac | grep -m1 -A 3 -B ${max_epoch_lines} "train errors" | tac
 else
-	echo "Usage: ${0##*/} log_file"
+    echo "Usage: ${0##*/} log_file"
 fi
 

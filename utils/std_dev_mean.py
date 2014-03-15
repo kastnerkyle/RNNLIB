@@ -23,7 +23,7 @@ import sys
 
 vals = []
 for l in sys.stdin.readlines():
-	vals.append(float(l))
+    vals.append(float(l))
 numVals = len(vals)
 stdDev = numpy.std(vals)
 print numVals,"values"

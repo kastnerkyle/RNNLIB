@@ -22,49 +22,49 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 
 struct GatherLayer: public Layer
 {
-	//data
-	vector<Layer*> sources;
-		
-	//functions
-	GatherLayer(const string& name, vector<Layer*>& srcs):
-		Layer(name, srcs.front()->num_seq_dims(), 0, get_size(srcs), srcs.front()),
-		sources(srcs)
-	{
-		source = sources.front();
-		WeightContainer::instance().new_parameters(0, source->name, name, source->name + "_to_" + name);
-		display(outputActivations, "activations");
-		display(outputErrors, "errors");
-	}
-	int get_size(vector<Layer*>& srcs)
-	{
-		int size = 0;
-		for (int i = 0; i < srcs.size(); ++i)
-		{
-			size += srcs[i]->output_size();
-		}
-		return size;
-	}
-	void feed_forward(const vector<int>& outCoords)
-	{
-		real_t* actBegin = outputActivations[outCoords].begin();
-		LOOP(Layer* l, sources)
-		{
-			View<real_t> inActs = l->outputActivations[outCoords];
-			copy(inActs.begin(), inActs.end(), actBegin);
-			actBegin += inActs.size();
-		}
-	}
-	void feed_back(const vector<int>& outCoords)
-	{
-		real_t* errBegin = outputErrors[outCoords].begin();
-		LOOP(Layer* l, sources)
-		{
-			View<real_t> inErrs = l->outputErrors[outCoords];
-			int dist = inErrs.size();
-			copy(errBegin, errBegin + dist, inErrs.begin());
-			errBegin += dist;
-		}
-	}
+    //data
+    vector<Layer*> sources;
+        
+    //functions
+    GatherLayer(const string& name, vector<Layer*>& srcs):
+        Layer(name, srcs.front()->num_seq_dims(), 0, get_size(srcs), srcs.front()),
+        sources(srcs)
+    {
+        source = sources.front();
+        WeightContainer::instance().new_parameters(0, source->name, name, source->name + "_to_" + name);
+        display(outputActivations, "activations");
+        display(outputErrors, "errors");
+    }
+    int get_size(vector<Layer*>& srcs)
+    {
+        int size = 0;
+        for (int i = 0; i < srcs.size(); ++i)
+        {
+            size += srcs[i]->output_size();
+        }
+        return size;
+    }
+    void feed_forward(const vector<int>& outCoords)
+    {
+        real_t* actBegin = outputActivations[outCoords].begin();
+        LOOP(Layer* l, sources)
+        {
+            View<real_t> inActs = l->outputActivations[outCoords];
+            copy(inActs.begin(), inActs.end(), actBegin);
+            actBegin += inActs.size();
+        }
+    }
+    void feed_back(const vector<int>& outCoords)
+    {
+        real_t* errBegin = outputErrors[outCoords].begin();
+        LOOP(Layer* l, sources)
+        {
+            View<real_t> inErrs = l->outputErrors[outCoords];
+            int dist = inErrs.size();
+            copy(errBegin, errBegin + dist, inErrs.begin());
+            errBegin += dist;
+        }
+    }
 };
 
 #endif

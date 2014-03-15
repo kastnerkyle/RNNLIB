@@ -23,33 +23,33 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 
 struct Connection: public Named
 {
-	//data
-	Layer* from;
-	Layer* to;
-	
-	//functions
-	Connection(const string& name, Layer* f, Layer* t):
-		Named(name),
-		from(f),
-		to(t)
-	{
-		assert(from);
-		assert(to);
-		assert(from->output_size());
-		assert(to->input_size());
-	}
-	virtual ~Connection(){}
-	virtual size_t num_weights() const {return 0;}
-	virtual void feed_forward(const vector<int>& coords){}
-	virtual void feed_back(const vector<int>& coords){}
-	virtual void update_derivs(const vector<int>& coords){}
-	virtual void print(ostream& out) const{}
-	virtual const View<real_t> weights(){return View<real_t>();}
+    //data
+    Layer* from;
+    Layer* to;
+    
+    //functions
+    Connection(const string& name, Layer* f, Layer* t):
+        Named(name),
+        from(f),
+        to(t)
+    {
+        assert(from);
+        assert(to);
+        assert(from->output_size());
+        assert(to->input_size());
+    }
+    virtual ~Connection(){}
+    virtual size_t num_weights() const {return 0;}
+    virtual void feed_forward(const vector<int>& coords){}
+    virtual void feed_back(const vector<int>& coords){}
+    virtual void update_derivs(const vector<int>& coords){}
+    virtual void print(ostream& out) const{}
+    virtual const View<real_t> weights(){return View<real_t>();}
 };
 static ostream& operator <<(ostream& out, const Connection& c)
 {
-	c.print(out);
-	return out;
+    c.print(out);
+    return out;
 }
 
 #endif

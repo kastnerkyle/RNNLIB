@@ -31,19 +31,19 @@ argsHelp="-a argument string to pass to rnnlib (default '')"
 badOptionHelp="Option not recognised"
 printHelpAndExit()
 {
-	echo "$usageHelp"
-	echo "$verboseHelp"
-	echo "$noiseHelp"
-	echo "$dictHelp"
-	echo "$bigramHelp"
-	echo "$logHelp"
-	echo "$fixedHelp"
-	echo "$bestHelp"
-	echo "$fracHelp"
-	echo "$confusionHelp"
-	echo "$unnormedHelp"
-	echo "$argsHelp"
-	exit $1
+    echo "$usageHelp"
+    echo "$verboseHelp"
+    echo "$noiseHelp"
+    echo "$dictHelp"
+    echo "$bigramHelp"
+    echo "$logHelp"
+    echo "$fixedHelp"
+    echo "$bestHelp"
+    echo "$fracHelp"
+    echo "$confusionHelp"
+    echo "$unnormedHelp"
+    echo "$argsHelp"
+    exit $1
 }
 printErrorHelpAndExit()
 {
@@ -66,64 +66,64 @@ sort_by_normed_prob=true
 arg_string=""
 while getopts "hcunv:d:b:f:g:l:r:a:" option
 do
-	case "$option" in
-		h) printHelpAndExit 0;;
-		n) noise=true;;
-		v) verbose="$OPTARG";;
-		d) dict_file="$OPTARG";;
-		g) bigram_file="$OPTARG";;
-		l) log_file="$OPTARG";;
-		f) fixed_length="$OPTARG";;
-		b) n_best="$OPTARG";;
-		r) data_fraction="$OPTARG";;
-		c) confusion_matrix=true;;
-		u) sort_by_normed_prob=false;;
-		a) arg_string="$OPTARG";;
-		[?]) printErrorHelpAndExit "$badOptionHelp";;
-	esac
+    case "$option" in
+        h) printHelpAndExit 0;;
+        n) noise=true;;
+        v) verbose="$OPTARG";;
+        d) dict_file="$OPTARG";;
+        g) bigram_file="$OPTARG";;
+        l) log_file="$OPTARG";;
+        f) fixed_length="$OPTARG";;
+        b) n_best="$OPTARG";;
+        r) data_fraction="$OPTARG";;
+        c) confusion_matrix=true;;
+        u) sort_by_normed_prob=false;;
+        a) arg_string="$OPTARG";;
+        [?]) printErrorHelpAndExit "$badOptionHelp";;
+    esac
 done
 shift $((OPTIND-1))
 if (( $# == 2 ))
 then
-	save_file=$1
-	data_file=$2
-	if [ "${data_file}" = "train" -o "${data_file}" = "test" -o "${data_file}" = "val" ]
-	then
-		data_file=`grep ${data_file}File ${save_file} | cut -d ' ' -f 2`
-	fi
-	if [ "${log_file}" = "" ]
-	then
-		log_file=error_test
-		for f in ${save_file} ${data_file} ${dict_file} ${bigram_file}
-		do
-			if [ "$f" != '""' ]
-			then
-				log_file=${log_file}-${f##*\/}
-			fi
-		done
-		if [ "${dict_file}" != '""' ]
-		then
-			log_file=${log_file}-fixed_length_${fixed_length}-${n_best}_best
-		fi
-		log_file=${log_file}.log
-	fi
-	`echo rnnlib --trainFile='""'\
-		--valFile='""'\
-		--testFile="${data_file}"\
-		--errorTest=true\
-		--verbose="${verbose}"\
-		--testDistortions="${noise}"\
-		--autosave=false\
-		--dataset=test\
-		--fixedLength="${fixed_length}"\
-		--nBest="${n_best}"\
-		--dataFraction="${data_fraction}"\
-		--confusionMatrix="${confusion_matrix}"\
-		--sortWordsByNormedProb="${sort_by_normed_prob}"\
-		--dictionary="${dict_file}"\
-		--bigrams="${bigram_file}"\
-		"${arg_string}"\
-		"${save_file}"` | tee ${log_file}
+    save_file=$1
+    data_file=$2
+    if [ "${data_file}" = "train" -o "${data_file}" = "test" -o "${data_file}" = "val" ]
+    then
+        data_file=`grep ${data_file}File ${save_file} | cut -d ' ' -f 2`
+    fi
+    if [ "${log_file}" = "" ]
+    then
+        log_file=error_test
+        for f in ${save_file} ${data_file} ${dict_file} ${bigram_file}
+        do
+            if [ "$f" != '""' ]
+            then
+                log_file=${log_file}-${f##*\/}
+            fi
+        done
+        if [ "${dict_file}" != '""' ]
+        then
+            log_file=${log_file}-fixed_length_${fixed_length}-${n_best}_best
+        fi
+        log_file=${log_file}.log
+    fi
+    `echo rnnlib --trainFile='""'\
+        --valFile='""'\
+        --testFile="${data_file}"\
+        --errorTest=true\
+        --verbose="${verbose}"\
+        --testDistortions="${noise}"\
+        --autosave=false\
+        --dataset=test\
+        --fixedLength="${fixed_length}"\
+        --nBest="${n_best}"\
+        --dataFraction="${data_fraction}"\
+        --confusionMatrix="${confusion_matrix}"\
+        --sortWordsByNormedProb="${sort_by_normed_prob}"\
+        --dictionary="${dict_file}"\
+        --bigrams="${bigram_file}"\
+        "${arg_string}"\
+        "${save_file}"` | tee ${log_file}
 else
-	printHelpAndExit 1
+    printHelpAndExit 1
 fi

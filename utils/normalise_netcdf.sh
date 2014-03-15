@@ -22,10 +22,10 @@ variableHelp="-v variable to normalise (default 'inputs')"
 badOptionHelp="Option not recognised"
 printHelpAndExit()
 {
-	echo "$usageHelp"
-	echo "$stdDevFileHelp"
-	echo "$variableHelp"
-	exit $1
+    echo "$usageHelp"
+    echo "$stdDevFileHelp"
+    echo "$variableHelp"
+    exit $1
 }
 printErrorHelpAndExit()
 {
@@ -39,44 +39,44 @@ mean_dev_file=""
 variable=inputs
 while getopts "hs:v:" option
 do
-	case "$option" in
-		h) printHelpAndExit 0;;
-		s) mean_dev_file="$OPTARG";;
-		v) variable="$OPTARG";;
-		[?]) printErrorHelpAndExit "$badOptionHelp";;
-	esac
+    case "$option" in
+        h) printHelpAndExit 0;;
+        s) mean_dev_file="$OPTARG";;
+        v) variable="$OPTARG";;
+        [?]) printErrorHelpAndExit "$badOptionHelp";;
+    esac
 done
 shift $((OPTIND-1))
 if (( "$#" > "0" ));
 then
-	script=normalise_netcdf.py
-	base=$1
-	adj=${base}_ADJ
-	echo ${base}
-	echo ${adj}
-	mean_dev_file_str=""
-	if [ "${mean_dev_file}" != "" ]
-	then
-		mean_dev_file_str="-s ${mean_dev_file}"
-	fi
-	$script ${mean_dev_file_str} -i ${variable} -o ${variable} ${base} ${adj}
-	ncks -A $adj $base
-	rm $adj
-	if [ "${mean_dev_file_str}" == "" ]
-	then
-		mean_dev_file_str="-s ${base}"
-	fi
-	while [ $# -gt 1 ]
-		do
-		shift
-		base=$1
-		adj=${base}_ADJ
-		echo ${base}
-		echo ${adj}
-		$script ${mean_dev_file_str} -i ${variable} -o ${variable} ${base} ${adj}
-		ncks -A $adj $base
-		rm $adj
-		done
+    script=normalise_netcdf.py
+    base=$1
+    adj=${base}_ADJ
+    echo ${base}
+    echo ${adj}
+    mean_dev_file_str=""
+    if [ "${mean_dev_file}" != "" ]
+    then
+        mean_dev_file_str="-s ${mean_dev_file}"
+    fi
+    $script ${mean_dev_file_str} -i ${variable} -o ${variable} ${base} ${adj}
+    ncks -A $adj $base
+    rm $adj
+    if [ "${mean_dev_file_str}" == "" ]
+    then
+        mean_dev_file_str="-s ${base}"
+    fi
+    while [ $# -gt 1 ]
+        do
+        shift
+        base=$1
+        adj=${base}_ADJ
+        echo ${base}
+        echo ${adj}
+        $script ${mean_dev_file_str} -i ${variable} -o ${variable} ${base} ${adj}
+        ncks -A $adj $base
+        rm $adj
+        done
 else
-	printHelpAndExit 1
+    printHelpAndExit 1
 fi

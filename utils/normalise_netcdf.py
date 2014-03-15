@@ -29,15 +29,15 @@ parser.add_option("-s", "--stdmeanfilename", action="store", type="string", dest
 parser.add_option("-b", "--bigfile", action="store_true", dest="bigFile", default=False, help="use memory optimisations for big files? (slower)")
 
 def Std(array,axis):
-	if shape(array)[axis]>1:
-		return (std(array,axis))
-	return array
+    if shape(array)[axis]>1:
+        return (std(array,axis))
+    return array
 
 #parse command line options
 (options, args) = parser.parse_args()
 print options
 if (len(args) != 2):
-	parser.error("incorrect number of arguments")
+    parser.error("incorrect number of arguments")
 inputFilename = args[0]
 outputFilename = args[1]
 print 'inputFilename', inputFilename
@@ -47,49 +47,49 @@ print "loading in input array"
 inputVar = infile.variables[options.inputArrayName]
 outputArray = zeros(inputVar.shape, 'f')
 if options.bigFile:
-	offset = 0
-	step = options.maxArraySize
-	while offset < inputVar.shape[0]:
-		max = min (offset+step, inputVar.shape[0])
-		outputArray[offset:max] = inputVar[offset:max]
-		offset += step
+    offset = 0
+    step = options.maxArraySize
+    while offset < inputVar.shape[0]:
+        max = min (offset+step, inputVar.shape[0])
+        outputArray[offset:max] = inputVar[offset:max]
+        offset += step
 else:
-	outputArray = inputVar.getValue()
+    outputArray = inputVar.getValue()
 
 if options.stdMeanFilename <> "":
-	print "reading std deviations and means from",options.stdMeanFilename
-	stdMeanFile = netcdf_helpers.NetCDFFile(options.stdMeanFilename, 'r')
-	inputStds = array(stdMeanFile.variables[options.inputArrayName+'Stds'].getValue())
-	inputMeans = array(stdMeanFile.variables[options.inputArrayName+'Means'].getValue())
+    print "reading std deviations and means from",options.stdMeanFilename
+    stdMeanFile = netcdf_helpers.NetCDFFile(options.stdMeanFilename, 'r')
+    inputStds = array(stdMeanFile.variables[options.inputArrayName+'Stds'].getValue())
+    inputMeans = array(stdMeanFile.variables[options.inputArrayName+'Means'].getValue())
 
 else:
-	print "calculating std deviations"
-	inputStds=Std(outputArray[:options.maxArraySize],0)
-	print "calculating means"
-	inputMeans=mean(outputArray[:options.maxArraySize],0)
+    print "calculating std deviations"
+    inputStds=Std(outputArray[:options.maxArraySize],0)
+    print "calculating means"
+    inputMeans=mean(outputArray[:options.maxArraySize],0)
 
 print inputStds
 print inputMeans
 
 for p in range(len(inputStds)):
-	if (inputStds[p]>0):
-		if options.bigFile:
-			offset = 0
-			step = options.maxArraySize
-			while offset < len(outputArray):
-				max = min (offset+step, len(outputArray))
-				outputArray[offset:max,p] = (outputArray[offset:max,p] - inputMeans[p])/inputStds[p]
-				offset += step
-		else:
-			outputArray[:,p]=(outputArray[:,p]-inputMeans[p])/inputStds[p]
+    if (inputStds[p]>0):
+        if options.bigFile:
+            offset = 0
+            step = options.maxArraySize
+            while offset < len(outputArray):
+                max = min (offset+step, len(outputArray))
+                outputArray[offset:max,p] = (outputArray[offset:max,p] - inputMeans[p])/inputStds[p]
+                offset += step
+        else:
+            outputArray[:,p]=(outputArray[:,p]-inputMeans[p])/inputStds[p]
 
 outfile = netcdf_helpers.NetCDFFile(outputFilename, 'w')
 
 for d in inputVar.dimensions:
-	netcdf_helpers.createNcDim(outfile,d,infile.dimensions[d])
+    netcdf_helpers.createNcDim(outfile,d,infile.dimensions[d])
 
 if options.stdMeanFilename == "":
-	netcdf_helpers.createNcVar(outfile,options.outputArrayName+'Means',inputMeans,'f',(inputVar.dimensions[1],),'input means')
-	netcdf_helpers.createNcVar(outfile,options.outputArrayName+'Stds',inputStds,'f',(inputVar.dimensions[1],),'input std deviations')
+    netcdf_helpers.createNcVar(outfile,options.outputArrayName+'Means',inputMeans,'f',(inputVar.dimensions[1],),'input means')
+    netcdf_helpers.createNcVar(outfile,options.outputArrayName+'Stds',inputStds,'f',(inputVar.dimensions[1],),'input std deviations')
 netcdf_helpers.createNcVar(outfile,options.outputArrayName,outputArray,'f',inputVar.dimensions,options.inputArrayName+' adjusted for mean 0 and std dev 1')
 outfile.close()

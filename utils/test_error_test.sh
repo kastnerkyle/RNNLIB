@@ -17,10 +17,10 @@
 
 #! /bin/bash
 if (( $# == 1 ))
-then	
-	error_test.sh $1 test 
+then    
+    error_test.sh $1 test 
 elif (( $# == 2 ))
-	error_test.sh $1 test $2 
+    error_test.sh $1 test $2 
 else
-	echo "usage: test_error_test.sh save_filename [log_filename]"
+    echo "usage: test_error_test.sh save_filename [log_filename]"
 fi

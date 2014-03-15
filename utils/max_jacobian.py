@@ -32,7 +32,7 @@ parser.add_option("-m", "--max", action="store_true", dest="max", help="show max
 options, args = parser.parse_args()
 
 if len(args) != 3:
-	parser.error("incorrect number of arguments")
+    parser.error("incorrect number of arguments")
 print options
 jaclistfile = args[0]
 outactsfile = args[1]
@@ -45,49 +45,49 @@ labels = file(outactsfile).readline().split()[1:]
 T = shape(a)[1]
 maxindices = []
 for t in range(T):
-	c = list(a[:,t])
-	m = c.index(max(c))
-	if not options.blank and labels[m] == 'blank':
-		c = c[:-1]
-		m = c.index(max(c))
-	maxindices.append(m)
+    c = list(a[:,t])
+    m = c.index(max(c))
+    if not options.blank and labels[m] == 'blank':
+        c = c[:-1]
+        m = c.index(max(c))
+    maxindices.append(m)
 print maxindices
 print len(labels)
 print labels
 if options.bylab:
-	v = zeros((len(labels),T),'f')
+    v = zeros((len(labels),T),'f')
 else:
-	v = zeros((T,T),'f')
+    v = zeros((T,T),'f')
 for f in file(jaclistfile).readlines():
-	a = io.read_array(file(f.strip()), lines=[1,-1])
-	output = int(f.split('/')[-2].split('_')[-1])
-#	print 'i', i
-	for input in range(T):
-#		print 'j', j
-		col = a[:,input]
-		if options.bylab:
-			if options.sum:
-				v[maxindices[output]][input] += sum([abs(k) for k in col])
-			else:
-				v[maxindices[output]][input] = sum([abs(k) for k in col])
-		else:
-			v[output][input] = sum([abs(k) for k in col])	
-#		print 'v[i][j]', v[i][j]
+    a = io.read_array(file(f.strip()), lines=[1,-1])
+    output = int(f.split('/')[-2].split('_')[-1])
+#   print 'i', i
+    for input in range(T):
+#       print 'j', j
+        col = a[:,input]
+        if options.bylab:
+            if options.sum:
+                v[maxindices[output]][input] += sum([abs(k) for k in col])
+            else:
+                v[maxindices[output]][input] = sum([abs(k) for k in col])
+        else:
+            v[output][input] = sum([abs(k) for k in col])   
+#       print 'v[i][j]', v[i][j]
 if options.softmax:
-	for t in range(T):
-		col = v[:,t]
-		Z = sum([exp(x) for x in col])
-		for y in range(len(col)):
-			v[y][t] = exp(col[y]) / Z
+    for t in range(T):
+        col = v[:,t]
+        Z = sum([exp(x) for x in col])
+        for y in range(len(col)):
+            v[y][t] = exp(col[y]) / Z
 if options.max:
-	for t in range(T):
-		c = list(v[:,t])
-		i = c.index(max(c))
-		v[:,t] = 0
-		v[i][t] = 1
+    for t in range(T):
+        c = list(v[:,t])
+        i = c.index(max(c))
+        v[:,t] = 0
+        v[i][t] = 1
 print shape(v)
 out = file(outfile, 'w')
 if options.bylab:
-	print >> out,'LABELS:', ' '.join(labels)
+    print >> out,'LABELS:', ' '.join(labels)
 print >> out,'DIMENSIONS:', T 
 io.write_array(out, v)

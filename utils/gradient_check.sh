@@ -30,18 +30,18 @@ argsHelp="-a argument string to pass to rnnlib (default '')"
 badOptionHelp="Option not recognised"
 printHelpAndExit()
 {
-	echo "$usageHelp"
-	echo "$keepHelp"
-	echo "$verboseHelp"
-	echo "$hiddenHelp"
-	echo "$sigHelp"
-	echo "$seqHelp"
-	echo "$pertHelp"
-	echo "$rangeHelp"
-	echo "$codeHelp"
-	echo "$secondHelp"
-	echo "$argsHelp"
-	exit $1
+    echo "$usageHelp"
+    echo "$keepHelp"
+    echo "$verboseHelp"
+    echo "$hiddenHelp"
+    echo "$sigHelp"
+    echo "$seqHelp"
+    echo "$pertHelp"
+    echo "$rangeHelp"
+    echo "$codeHelp"
+    echo "$secondHelp"
+    echo "$argsHelp"
+    exit $1
 }
 printErrorHelpAndExit()
 {
@@ -64,51 +64,51 @@ sequence=0
 weight_range=0.1
 while getopts "hkv2p:s:f:u:c:a:r:" option
 do
-	case "$option" in
-		h) printHelpAndExit 0;;
-		k) keep_temp_file=1;;
-		v) verbose=true;;
-		p) perturbation="$OPTARG";;
-		f) sig_figs="$OPTARG";;
-		s) sequence="$OPTARG";;
-		u) hidden_units="$OPTARG";;
-		c) code_units="$OPTARG";;
-		2) second_derivs=true;;
-		a) arg_string="$OPTARG";;
-		r) weight_range="$OPTARG";;
-		[?]) printErrorHelpAndExit "$badOptionHelp";;
-	esac
+    case "$option" in
+        h) printHelpAndExit 0;;
+        k) keep_temp_file=1;;
+        v) verbose=true;;
+        p) perturbation="$OPTARG";;
+        f) sig_figs="$OPTARG";;
+        s) sequence="$OPTARG";;
+        u) hidden_units="$OPTARG";;
+        c) code_units="$OPTARG";;
+        2) second_derivs=true;;
+        a) arg_string="$OPTARG";;
+        r) weight_range="$OPTARG";;
+        [?]) printErrorHelpAndExit "$badOptionHelp";;
+    esac
 done
 shift $((OPTIND-1))
 if (( $# == 1 ))
 then
-	save_file=$1
-	tmp_file=${save_file}_GRAD_CHECK_TEMP
-	extra_levels=`grep hiddenSize ${save_file} | grep -o "," | wc -l | sed s/\ //g`
-	sed "s:codeSize:codeSize ${CODESIZE}:g" ${save_file} |
-	sed "s:autosave:autosave false:g" |
-	sed "s:sampling:sampling false:g" > ${tmp_file}
-	echo "gradCheck true" >> ${tmp_file}
-	echo "sequence ${sequence}" >> ${tmp_file}
-	echo "sigFigs ${sig_figs}" >> ${tmp_file}
-	echo "pert ${perturbation}" >> ${tmp_file}
-	echo "initWeightRange ${weight_range}" >> ${tmp_file}
-	echo "verbose ${verbose}" >> ${tmp_file}
-	if ( ${second_derivs} == "true" )
-	then
-		echo "secondDerivs true" >> ${tmp_file}
-		echo "mdlInitStdDev 1" >> ${tmp_file}
-	fi
-	echo -n "hiddenSize ${hidden_units}" >> ${tmp_file}
-	for ((l=0; l < $extra_levels ; l++)) 
-		do echo -n ,${hidden_units} >> ${tmp_file}
-	done 
-	set -x
-	`echo rnnlib "${arg_string}" ${tmp_file}`
-	if (( ${keep_temp_file} == 0 ))
-	then
-		rm ${tmp_file}
-	fi
+    save_file=$1
+    tmp_file=${save_file}_GRAD_CHECK_TEMP
+    extra_levels=`grep hiddenSize ${save_file} | grep -o "," | wc -l | sed s/\ //g`
+    sed "s:codeSize:codeSize ${CODESIZE}:g" ${save_file} |
+    sed "s:autosave:autosave false:g" |
+    sed "s:sampling:sampling false:g" > ${tmp_file}
+    echo "gradCheck true" >> ${tmp_file}
+    echo "sequence ${sequence}" >> ${tmp_file}
+    echo "sigFigs ${sig_figs}" >> ${tmp_file}
+    echo "pert ${perturbation}" >> ${tmp_file}
+    echo "initWeightRange ${weight_range}" >> ${tmp_file}
+    echo "verbose ${verbose}" >> ${tmp_file}
+    if ( ${second_derivs} == "true" )
+    then
+        echo "secondDerivs true" >> ${tmp_file}
+        echo "mdlInitStdDev 1" >> ${tmp_file}
+    fi
+    echo -n "hiddenSize ${hidden_units}" >> ${tmp_file}
+    for ((l=0; l < $extra_levels ; l++)) 
+        do echo -n ,${hidden_units} >> ${tmp_file}
+    done 
+    set -x
+    `echo rnnlib "${arg_string}" ${tmp_file}`
+    if (( ${keep_temp_file} == 0 ))
+    then
+        rm ${tmp_file}
+    fi
 else
-	printHelpAndExit 1
+    printHelpAndExit 1
 fi

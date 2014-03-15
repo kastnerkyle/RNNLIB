@@ -17,27 +17,27 @@
 
 labstr='LABELS: '
 for f in $*; do 
-	if [ `grep -c LABELS $f` = '0' ]
-	then
-		n=$(( `wc -l $f | cut -d ' ' -f 1` - 1 ))
-		for i in `seq $n`; do
-			labstr=$labstr$f"_"$i" "
-			echo $labstr
-		done
-	else
-		str=`grep "LABELS" $f`
-		str=${str#"LABELS: "}
-		for s in $str; do
-			labstr=$labstr$f"_"$s" "
-		done
-#		echo $str
-#		labstr=$labstr${str#"LABELS: "}
-	fi
+    if [ `grep -c LABELS $f` = '0' ]
+    then
+        n=$(( `wc -l $f | cut -d ' ' -f 1` - 1 ))
+        for i in `seq $n`; do
+            labstr=$labstr$f"_"$i" "
+            echo $labstr
+        done
+    else
+        str=`grep "LABELS" $f`
+        str=${str#"LABELS: "}
+        for s in $str; do
+            labstr=$labstr$f"_"$s" "
+        done
+#       echo $str
+#       labstr=$labstr${str#"LABELS: "}
+    fi
 done
 echo $labstr > PLOT_MULTI_TEMP
 grep DIMENSIONS $1 >> PLOT_MULTI_TEMP
 for f in $*; do 
-	egrep -v 'LABELS|DIMENSIONS' $f >> PLOT_MULTI_TEMP
+    egrep -v 'LABELS|DIMENSIONS' $f >> PLOT_MULTI_TEMP
 done
 plot_variables.py -k PLOT_MULTI_TEMP
 #rm PLOT_MULTI_TEMP

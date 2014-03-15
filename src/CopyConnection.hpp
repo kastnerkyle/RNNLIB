@@ -22,30 +22,30 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 
 struct CopyConnection: public Connection
 {
-	//functions
-	CopyConnection(Layer* f, Layer* t):
-		Connection(f->name + "_to_" + t->name, f, t)
-	{
-		assert(this->from != this->to);
-		assert(this->from->output_size() == this->to->input_size());
-		assert(this->from->output_size());
-		this->to->source = this->from;
-		WeightContainer::instance().link_layers(this->from->name, this->to->name);
-	}
-	virtual ~CopyConnection(){}
-	void feed_forward(const vector<int>& coords)
-	{
-		range_plus_equals(this->to->inputActivations[coords], this->from->outputActivations[coords]);
-	}
-	void feed_back(const vector<int>& coords)
-	{
-		range_plus_equals(this->from->outputErrors[coords], this->to->inputErrors[coords]);
-	}
-	void print(ostream& out) const
-	{
-		Named::print(out);
-		out << " (copy)";
-	}
+    //functions
+    CopyConnection(Layer* f, Layer* t):
+        Connection(f->name + "_to_" + t->name, f, t)
+    {
+        assert(this->from != this->to);
+        assert(this->from->output_size() == this->to->input_size());
+        assert(this->from->output_size());
+        this->to->source = this->from;
+        WeightContainer::instance().link_layers(this->from->name, this->to->name);
+    }
+    virtual ~CopyConnection(){}
+    void feed_forward(const vector<int>& coords)
+    {
+        range_plus_equals(this->to->inputActivations[coords], this->from->outputActivations[coords]);
+    }
+    void feed_back(const vector<int>& coords)
+    {
+        range_plus_equals(this->from->outputErrors[coords], this->to->inputErrors[coords]);
+    }
+    void print(ostream& out) const
+    {
+        Named::print(out);
+        out << " (copy)";
+    }
 };
 
 #endif

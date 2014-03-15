@@ -35,15 +35,15 @@ filenames = glob.glob(filePattern)
 minVal = 100000000.0
 maxVal = -minVal
 for f in filenames:
-#	print f
-	lines = file(f).readlines()
-	for l in lines:
-		data = l.split()
-		for d in data:
-			f = float(d)
-			if f > maxVal:
-				maxVal = f
-			if f < minVal:
-				minVal = f
+#   print f
+    lines = file(f).readlines()
+    for l in lines:
+        data = l.split()
+        for d in data:
+            f = float(d)
+            if f > maxVal:
+                maxVal = f
+            if f < minVal:
+                minVal = f
 
 print minVal,maxVal

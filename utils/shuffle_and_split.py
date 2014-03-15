@@ -25,33 +25,33 @@ from optparse import OptionParser
 parser = OptionParser("usage: %prog [options] input_file split_fractions output_root")
 (options, args) = parser.parse_args()
 if (len(args) != 3):
-	parser.error("incorrect number of arguments")
+    parser.error("incorrect number of arguments")
 print options
 infilename = args [0]
 splitstrings = args[1].split()
 if len(splitstrings) == 1:
-	numSplits = int(splitstrings[0])
-	splitfracs = [1.0/numSplits] * numSplits
+    numSplits = int(splitstrings[0])
+    splitfracs = [1.0/numSplits] * numSplits
 else:
-	splitfracs = [float(i) for i in splitstrings]
+    splitfracs = [float(i) for i in splitstrings]
 outroot = args[2]
 lines = file(infilename).readlines()
 random.shuffle(lines)
 if abs(sum(splitfracs) - 1) > 0.000001:
-	print "ERROR: split fractions sum to", sum(splitfracs), "not 1.0, exiting"
-	sys.exit(0)
+    print "ERROR: split fractions sum to", sum(splitfracs), "not 1.0, exiting"
+    sys.exit(0)
 #print splitfracs
 line = 0
 splitlines = []
 for i,s in enumerate(splitfracs[:-1]):
-	line += int(s * len(lines))
-	splitlines.append(line)
+    line += int(s * len(lines))
+    splitlines.append(line)
 splitlines.append(len(lines))
 oldl = 0
 numDigits = len(str(len(splitlines) - 1))
 for i,l in enumerate(splitlines):
-	out = file(outroot + '_' + str(i).rjust(numDigits, '0') + '.txt', 'w')
-	for line in lines[oldl:l]:
-		print >> out, line.strip()
-	oldl =l
+    out = file(outroot + '_' + str(i).rjust(numDigits, '0') + '.txt', 'w')
+    for line in lines[oldl:l]:
+        print >> out, line.strip()
+    oldl =l
 out.close()

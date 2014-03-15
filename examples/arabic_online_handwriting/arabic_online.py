@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-
+import sys
+sys.path.append('../../utils')
 import netcdf_helpers
 from scipy import *
 from optparse import OptionParser
-import sys
 import os
 from xml.dom.minidom import parse
 
@@ -18,9 +18,9 @@ parser = OptionParser()
 #parse command line options
 (options, args) = parser.parse_args()
 if (len(args)<2):
-	print "usage: -options input_filename output_filename"
-	print options
-	sys.exit(2)
+    print "usage: -options input_filename output_filename"
+    print options
+    sys.exit(2)
 
 inputFilename = args [0]
 ncFilename = args[1]
@@ -35,41 +35,41 @@ seqTags = []
 inputs = []
 print "reading data files"
 for l in file(inputFilename).readlines():
-	inkmlfile = l.strip()
-	if len(inkmlfile):
-		print inkmlfile
-		seqTags.append(inkmlfile)
-		upxfile = inkmlfile.replace('inkml', 'upx')
-		if os.path.exists(upxfile):
-			word = parse(upxfile).getElementsByTagName('hwData')[0].getElementsByTagName('label')[0].getElementsByTagName('alternate')[0].getAttribute('value').strip().replace(' ','*')
-			print word
-			wts = word.encode('unicode_escape')
-			print wts
-			wordTargetStrings.append(wts)	
-			ts = ""
-			for c in word:
-				label = c.encode('unicode_escape')
-				ts += label + ' '
-			ts = ts.strip()
-			print ts
-			targetStrings.append(ts)
-		else:
-			wordTargetStrings.append(' ')
-			targetStrings.append(' ')			
-		oldlen = len(inputs)
-		for trace in parse(inkmlfile).getElementsByTagName('trace'):		
-			for coords in trace.firstChild.nodeValue.split(','):
-				pt = coords.split()
-				inputs.append([float(pt[0]), float(pt[1]), 0.0])
-			inputs[-1][-1] = 1
-		seqLengths.append(len(inputs) - oldlen)
-		seqDims.append([seqLengths[-1]])
+    inkmlfile = l.strip()
+    if len(inkmlfile):
+        print inkmlfile
+        seqTags.append(inkmlfile)
+        upxfile = inkmlfile.replace('inkml', 'upx')
+        if os.path.exists(upxfile):
+            word = parse(upxfile).getElementsByTagName('hwData')[0].getElementsByTagName('label')[0].getElementsByTagName('alternate')[0].getAttribute('value').strip().replace(' ','*')
+            print word
+            wts = word.encode('unicode_escape')
+            print wts
+            wordTargetStrings.append(wts)
+            ts = ""
+            for c in word:
+                label = c.encode('unicode_escape')
+                ts += label + ' '
+            ts = ts.strip()
+            print ts
+            targetStrings.append(ts)
+        else:
+            wordTargetStrings.append(' ')
+            targetStrings.append(' ')
+        oldlen = len(inputs)
+        for trace in parse(inkmlfile).getElementsByTagName('trace'):
+            for coords in trace.firstChild.nodeValue.split(','):
+                pt = coords.split()
+                inputs.append([float(pt[0]), float(pt[1]), 0.0])
+            inputs[-1][-1] = 1
+        seqLengths.append(len(inputs) - oldlen)
+        seqDims.append([seqLengths[-1]])
 inputs = ((array(inputs)-inputMeans)/inputStds).tolist()
 print len(labels), labels
 print labels
 
 #create a new .nc file
-file = netcdf_helpers.NetCDFFile(ncFilename, 'w')
+file = netcdf_helpers.netCDF4.Dataset(ncFilename, 'w')
 
 #create the dimensions
 netcdf_helpers.createNcDim(file,'numSeqs',len(seqLengths))

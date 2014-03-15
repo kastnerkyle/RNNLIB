@@ -1,2 +1,2 @@
 #! /bin/bash
-./arabic_offline.py filenames.txt arabic_offline.nc
+python arabic_offline.py filenames.txt arabic_offline.nc

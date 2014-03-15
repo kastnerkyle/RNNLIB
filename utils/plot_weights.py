@@ -27,25 +27,25 @@ parser.add_option('-b', '--bins', dest='bins', default=100, type='int', action='
 parser.add_option('-r', '--range', dest='range', type='string', default=None, action='store', help='histogram range (default = [data.min(), data.max()])')
 (opt, args) = parser.parse_args()
 if len(args) != 1:
-	parser.error('incorrect number of arguments')
+    parser.error('incorrect number of arguments')
 weightTypes = opt.weightTypes.split()
 connections = None
 if opt.connections:
-	connections = opt.connections.split()
+    connections = opt.connections.split()
 range = None
 if opt.range:
-	range = [float(f) for f in opt.range.split()]
+    range = [float(f) for f in opt.range.split()]
 for l in open(args[0]):
-	words = l.split()
-	connStr = words[0]
-	connName = connStr.split('_')[1:]
-	if (not(connections) or len([c for c in connections if c in connStr])) and len(connName) > 1 and connName[-1] in weightTypes:
-		figure()		
-		hist([float(f) for f in words[2:]], opt.bins, range)
-		xlabel('value')
-		ylabel('frequency')
-		title(' '.join(connName))
+    words = l.split()
+    connStr = words[0]
+    connName = connStr.split('_')[1:]
+    if (not(connections) or len([c for c in connections if c in connStr])) and len(connName) > 1 and connName[-1] in weightTypes:
+        figure()        
+        hist([float(f) for f in words[2:]], opt.bins, range)
+        xlabel('value')
+        ylabel('frequency')
+        title(' '.join(connName))
 show()
-		
+        
 
-					
+                    

@@ -22,21 +22,21 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 
 struct InputLayer: public Layer
 {
-	//functions
-	InputLayer(const string& name, size_t numSeqDims, size_t size, const vector<string>& inputLabels):
-		Layer(name, numSeqDims, 0, size)
-	{
-		const vector<string>* labs = inputLabels.empty() ? 0 : &inputLabels;
-		display(this->outputActivations, "activations", labs);
-		display(this->outputErrors, "errors", labs);
-	}
-	~InputLayer(){}
-	template<typename T> void copy_inputs(const SeqBuffer<T>& inputs)
-	{
-		assert(inputs.depth == this->output_size());
-		this->outputActivations = inputs;
- 		this->outputErrors.reshape(this->outputActivations, 0);
-	}
+    //functions
+    InputLayer(const string& name, size_t numSeqDims, size_t size, const vector<string>& inputLabels):
+        Layer(name, numSeqDims, 0, size)
+    {
+        const vector<string>* labs = inputLabels.empty() ? 0 : &inputLabels;
+        display(this->outputActivations, "activations", labs);
+        display(this->outputErrors, "errors", labs);
+    }
+    ~InputLayer(){}
+    template<typename T> void copy_inputs(const SeqBuffer<T>& inputs)
+    {
+        assert(inputs.depth == this->output_size());
+        this->outputActivations = inputs;
+        this->outputErrors.reshape(this->outputActivations, 0);
+    }
 };
 
 #endif

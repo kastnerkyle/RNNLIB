@@ -22,35 +22,35 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 
 template <class F> struct NeuronLayer: public FlatLayer
 {
-	NeuronLayer(const string& name, size_t numDims, size_t size):
-		FlatLayer(name, numDims, size)
-	{
-		init();
-	}
-	NeuronLayer(const string& name, const vector<int>& directions, size_t size):
-		FlatLayer(name, directions, size)
-	{
-		init();
-	}
-	~NeuronLayer(){}
-	void init()
-	{
-		display(this->inputActivations, "inputActivations");
-		display(this->outputActivations, "outputActivations");
-		display(this->inputErrors, "inputErrors");
-		display(this->outputErrors, "outputErrors");	
-	}
-	void feed_forward(const vector<int>& coords)
-	{
-		transform(this->inputActivations[coords], this->outputActivations[coords], F::fn);
-	}
-	void feed_back(const vector<int>& coords)
-	{
-		LOOP(TDDD t, zip(this->inputErrors[coords], this->outputActivations[coords], this->outputErrors[coords]))
-		{
-			t.get<0>() = F::deriv(t.get<1>()) * t.get<2>();
-		}
-	}
+    NeuronLayer(const string& name, size_t numDims, size_t size):
+        FlatLayer(name, numDims, size)
+    {
+        init();
+    }
+    NeuronLayer(const string& name, const vector<int>& directions, size_t size):
+        FlatLayer(name, directions, size)
+    {
+        init();
+    }
+    ~NeuronLayer(){}
+    void init()
+    {
+        display(this->inputActivations, "inputActivations");
+        display(this->outputActivations, "outputActivations");
+        display(this->inputErrors, "inputErrors");
+        display(this->outputErrors, "outputErrors");    
+    }
+    void feed_forward(const vector<int>& coords)
+    {
+        transform(this->inputActivations[coords], this->outputActivations[coords], F::fn);
+    }
+    void feed_back(const vector<int>& coords)
+    {
+        LOOP(TDDD t, zip(this->inputErrors[coords], this->outputActivations[coords], this->outputErrors[coords]))
+        {
+            t.get<0>() = F::deriv(t.get<1>()) * t.get<2>();
+        }
+    }
 };
 
 #endif

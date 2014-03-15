@@ -26,22 +26,22 @@ using namespace std;
 
 struct Named
 {
-	string name;
-	Named(const string & n):
-		name(n)
-	{}
-	virtual ~Named(){}
-	void print(ostream& out = cout) const
-	{
-		out << "\"" << name << "\"";
-	}
-	
+    string name;
+    Named(const string & n):
+        name(n)
+    {}
+    virtual ~Named(){}
+    void print(ostream& out = cout) const
+    {
+        out << "\"" << name << "\"";
+    }
+    
 };
 
 static ostream& operator << (ostream& out, const Named& n)
 {
-	n.print(out);
-	return out;
+    n.print(out);
+    return out;
 }
 
 #endif

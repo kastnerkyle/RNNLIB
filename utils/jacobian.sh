@@ -23,11 +23,11 @@ distortionHelp="-d apply input distortions? (default false)"
 badOptionHelp="Option not recognised"
 printHelpAndExit()
 {
-	echo "$usageHelp"
-#	echo "$keepHelp"
-	echo "$filenumHelp"
-	echo "$distortionHelp"
-	exit $1
+    echo "$usageHelp"
+#   echo "$keepHelp"
+    echo "$filenumHelp"
+    echo "$distortionHelp"
+    exit $1
 }
 printErrorHelpAndExit()
 {
@@ -43,38 +43,38 @@ distortions=false
 #while getopts "hkdf:" option
 while getopts "hdf:" option
 do
-	case "$option" in
-		h) printHelpAndExit 0;;
-#		k) keep_temp_file=1;;
-		d) distortions=true;;
-		f) file_num="$OPTARG";;
-		[?]) printErrorHelpAndExit "$badOptionHelp";;
-	esac
+    case "$option" in
+        h) printHelpAndExit 0;;
+#       k) keep_temp_file=1;;
+        d) distortions=true;;
+        f) file_num="$OPTARG";;
+        [?]) printErrorHelpAndExit "$badOptionHelp";;
+    esac
 done
 shift $((OPTIND-1))
 if (( $# == 4 ))
 then
-	save_file=$1
-	data_file=$2
-	seq_num=$3
-	coords=$4
-	if [ "${data_file}" = "train" -o "${data_file}" = "test" -o "${data_file}" = "val" ]
-	then
-		data_file=`grep ${data_file}File ${save_file} | cut -d ' ' -f 2 | cut -d ',' -f ${file_num}`
-	fi
-	output_dir=jacobian_${save_file}_${data_file##*/}_${seq_num}_${coords}/
-	mkdir ${output_dir}
-	rnnlib --trainFile='""'\
-		--valFile='""'\
-		--testFile="${data_file}"\
-		--jacobianCoords=${coords} \
-		--dumpPath="${output_dir}"\
-		--autosave=false\
-		--verbose=true\
-		--testDistortions="${distortions}"\
-		--dataset=test\
-		"${save_file}" 
+    save_file=$1
+    data_file=$2
+    seq_num=$3
+    coords=$4
+    if [ "${data_file}" = "train" -o "${data_file}" = "test" -o "${data_file}" = "val" ]
+    then
+        data_file=`grep ${data_file}File ${save_file} | cut -d ' ' -f 2 | cut -d ',' -f ${file_num}`
+    fi
+    output_dir=jacobian_${save_file}_${data_file##*/}_${seq_num}_${coords}/
+    mkdir ${output_dir}
+    rnnlib --trainFile='""'\
+        --valFile='""'\
+        --testFile="${data_file}"\
+        --jacobianCoords=${coords} \
+        --dumpPath="${output_dir}"\
+        --autosave=false\
+        --verbose=true\
+        --testDistortions="${distortions}"\
+        --dataset=test\
+        "${save_file}" 
 else
-	printHelpAndExit 1
+    printHelpAndExit 1
 fi
 

@@ -28,7 +28,7 @@ parser.add_option("-o", "--one", action="store", type="float", dest="one", defau
 (options, args) = parser.parse_args()
 print options
 if (len(args) != 1):
-	parser.error("incorrect number of arguments")
+    parser.error("incorrect number of arguments")
 filename = args[0]
 print 'filename', filename
 infile = NetCDFFile(filename, 'a')
@@ -36,10 +36,10 @@ invar = infile.variables['inputs']
 inputs = invar.getValue()
 print inputs.shape
 for i in range(len(inputs)):
-	for j in range(len(inputs[0])):
-		if inputs[i][j] > 0:
-			inputs[i][j] = options.one
-		else:
-			inputs[i][j] = options.zero			
+    for j in range(len(inputs[0])):
+        if inputs[i][j] > 0:
+            inputs[i][j] = options.one
+        else:
+            inputs[i][j] = options.zero         
 invar.assignValue(inputs)
 infile.close()

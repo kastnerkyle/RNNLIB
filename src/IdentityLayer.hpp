@@ -22,28 +22,28 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include "Helpers.hpp"
 
 struct IdentityLayer: public FlatLayer
-{	
-	//functions
-	IdentityLayer(const string& name, size_t numSeqDims, size_t size):
-		FlatLayer(name, numSeqDims, size)
-	{
-		display(this->outputErrors, "errors");
-		display(this->outputActivations, "activations");
-	}
-	IdentityLayer(const string& name, const vector<int>& directions, size_t size):
-		FlatLayer(name, directions, size)
-	{
-		display(this->outputErrors, "errors");
-		display(this->outputActivations, "activations");
-	}
-	void feed_forward(const vector<int>& coords)
-	{
-		copy(this->inputActivations[coords], this->outputActivations[coords]);
-	}
-	void feed_back(const vector<int>& coords)
-	{
-		copy(this->outputErrors[coords], this->inputErrors[coords]);
-	}
+{   
+    //functions
+    IdentityLayer(const string& name, size_t numSeqDims, size_t size):
+        FlatLayer(name, numSeqDims, size)
+    {
+        display(this->outputErrors, "errors");
+        display(this->outputActivations, "activations");
+    }
+    IdentityLayer(const string& name, const vector<int>& directions, size_t size):
+        FlatLayer(name, directions, size)
+    {
+        display(this->outputErrors, "errors");
+        display(this->outputActivations, "activations");
+    }
+    void feed_forward(const vector<int>& coords)
+    {
+        copy(this->inputActivations[coords], this->outputActivations[coords]);
+    }
+    void feed_back(const vector<int>& coords)
+    {
+        copy(this->outputErrors[coords], this->inputErrors[coords]);
+    }
 };
 
 #endif

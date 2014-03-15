@@ -24,15 +24,15 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #define ERR(x) this->errorMap[#x] = x
 
 struct NetworkOutput
-{	
-	//data
-	map <string, real_t> errorMap;
-	map <string, real_t> normFactors;
-	Vector<string> criteria;
-	
-	//functions
-	NetworkOutput(){}
-	virtual real_t calculate_errors(const DataSequence& seq){return realMax;}
+{   
+    //data
+    map <string, real_t> errorMap;
+    map <string, real_t> normFactors;
+    Vector<string> criteria;
+    
+    //functions
+    NetworkOutput(){}
+    virtual real_t calculate_errors(const DataSequence& seq){return realMax;}
 };
 
 #endif
