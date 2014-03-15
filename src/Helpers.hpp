@@ -341,7 +341,7 @@ template <class T> static integer_range<T> span(T t)
     //	return make_pair(counting_iterator<T>(0), counting_iterator<T>(t));
 }
 //template <class R> static pair<counting_iterator<typename range_difference<R>::type>, counting_iterator<typename range_difference<R>::type> > indices(const R& r)
-template <class R> static integer_range<typename boost::range_size<R>::type> indices(const R& r)
+template <class R> static integer_range<typename boost::range_difference<R>::type> indices(const R& r)
 {
 	return span(boost::size(r));
 }
