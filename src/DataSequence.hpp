@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -26,24 +26,27 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include "Helpers.hpp"
 #include "SeqBuffer.hpp"
 
-#define PRINT_ARRAY_SHAPE(a, o) (o << #a ": shape = [" << a.shape << "], size = " << a.seq_size() << endl)
-
-template<class R> static string label_seq_to_str(const R& labelSeq, const bimap<int, string>& labels, const string& delim = " ")
+template<class R> static string label_seq_to_str(const R& labelSeq, const vector<string>& alphabet, const string& delim = " ")
 {
-	if (!boost::size(labelSeq))
-	{
-		return "";
-	}
 	stringstream ss;
-	typename range_const_iterator<R>::type it = boost::begin(labelSeq);
-	ss << labels.left.at(*it);
-	for (++it; it != boost::end(labelSeq); ++it)
+	for (typename range_const_iterator<R>::type it = boost::begin(labelSeq); it != boost::end(labelSeq); ++it)
 	{
-		ss << delim << labels.left.at(*it);
+		if (in_range(alphabet,*it))
+		{
+			ss << alphabet[*it];
+		}
+		else
+		{
+			ss << "<NULL>";
+		}
+		if (it != --boost::end(labelSeq))
+		{
+			ss << delim;
+		}
 	}
 	return ss.str();
 }
-static vector<int> str_to_label_seq(const string& labelSeqString, const bimap<int, string>& labels)
+static vector<int> str_to_label_seq(const string& labelSeqString, const vector<string>& alphabet)
 {
 	static vector<int> v;
 	v.clear();
@@ -51,8 +54,13 @@ static vector<int> str_to_label_seq(const string& labelSeqString, const bimap<in
 	string lab;
 	while(ss >> lab)
 	{
-		check(in_right(labels, lab), lab + " not found in labels");
-		v += labels.right.at(lab);
+/*		check(in_right(alphabet, lab), lab + " not found in alphabet");*/
+//		if (warn_unless(in_right(alphabet, lab), lab + " not found in alphabet"))
+		int i = index(alphabet, lab);
+		if (i != alphabet.size())
+		{
+			v += i;
+		}
 	}
 	return v;
 }
@@ -60,47 +68,62 @@ static vector<int> str_to_label_seq(const string& labelSeqString, const bimap<in
 struct DataSequence
 {
 	//data
-	SeqBuffer<float> inputs;
-	SeqBuffer<float> targetPatterns;
+	SeqBuffer<real_t> inputs;
+	SeqBuffer<int> inputClasses;
+	SeqBuffer<real_t> targetPatterns;
 	SeqBuffer<int> targetClasses;
-//	SeqBuffer<float> importance;
-	vector<int> labelSeq;
+	SeqBuffer<real_t> importance;
+	vector<int> targetLabelSeq;
+	vector<string> targetWordSeq;
 	string tag;
 	
 	//functions
 	DataSequence(const DataSequence& ds):
 		inputs(ds.inputs),
+		inputClasses(ds.inputClasses),
 		targetPatterns(ds.targetPatterns),
 		targetClasses(ds.targetClasses),
-//		importance(ds.importance),
-		labelSeq(ds.labelSeq),
+		importance(ds.importance),
+		targetLabelSeq(ds.targetLabelSeq),
 		tag(ds.tag)
 	{
 	}
-	DataSequence(size_t inputDepth = 0, size_t targetPattDepth = 0, size_t targetClassDepth = 1):
+	DataSequence(size_t inputDepth = 0, size_t targetPattDepth = 0):
 		inputs(inputDepth),
+		inputClasses(0),
 		targetPatterns(targetPattDepth),
-		targetClasses(targetClassDepth)
-//		importance(1)
+		targetClasses(0),
+		importance(0)
 	{
 	}
 	size_t num_timesteps() const
 	{
 		return inputs.seq_size();
 	}	
-	void print(ostream& out, const bimap<int, string>* labels = 0) const
+	void print(ostream& out, vector<string>* targetLabels = 0, vector<string>* inputLabels = 0) const
 	{
 		PRINT(tag, out);
 		out << "input shape = (" << inputs.shape << ")" << endl;
 		out << "timesteps = " << inputs.seq_size() << endl;
-		if (labelSeq.size() && labels)
+		if (targetLabelSeq.size() && targetLabels)
 		{
-			out << "target labels:" << endl;
-			out << label_seq_to_str(this->labelSeq, *labels) << endl;
+			out << "target label sequence:" << endl;
+			out << label_seq_to_str(this->targetLabelSeq, *targetLabels) << endl;
 		}
 		if (targetPatterns.size())
 		{
 			out << "target shape = (" << targetPatterns.shape << ")" << endl;
+		}
+		if (verbose)
+		{
+			if(targetClasses.size() && targetLabels)
+			{
+				out << label_seq_to_str(this->targetClasses.data, *targetLabels) << endl;
+			}
+			if(inputClasses.size() && inputLabels)
+			{
+				out << label_seq_to_str(this->inputClasses.data, *inputLabels) << endl;
+			}
 		}
 	}
 };

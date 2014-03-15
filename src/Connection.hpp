@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -44,6 +44,7 @@ struct Connection: public Named
 	virtual void feed_back(const vector<int>& coords){}
 	virtual void update_derivs(const vector<int>& coords){}
 	virtual void print(ostream& out) const{}
+	virtual const View<real_t> weights(){return View<real_t>();}
 };
 static ostream& operator <<(ostream& out, const Connection& c)
 {

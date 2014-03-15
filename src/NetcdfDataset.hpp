@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -24,7 +24,7 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include <numeric>
 #include <map>
 #include <netcdfcpp.h>
-#include <boost/bimap.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include "DataSequence.hpp"
 #include "Helpers.hpp"
 
@@ -57,6 +57,12 @@ static NcVar* load_nc_variable (const NcFile& ncf, const string& name, bool requ
 	}
 	return v;
 }
+bool find_nc_variable(const NcFile& ncf, const string& name)
+{
+	NcVar *v = load_nc_variable(ncf, name, false);
+	bool ret = (v != 0);
+	return ret;
+}
 static string get_nc_string(const NcFile& ncf, const string& name, int offset = 0, bool required = true)
 {
 	static array<long, 2> offsets = {{0, 0}};
@@ -69,7 +75,7 @@ static string get_nc_string(const NcFile& ncf, const string& name, int offset = 
 		counts.back() = shape[1];
 		v->set_cur(&offsets.front());
 		char* temp = new char [shape[1]];
-		delete shape;
+		delete [] shape;
 		bool success = v->get(temp, &counts.front());
 		if(!success)
 		{
@@ -91,7 +97,7 @@ template<class T> static bool load_nc_array(const NcFile& ncf, const string& nam
 		vector<long> counts (v->num_dims());
 		long* shape = v->edges();
 		transform(shape, shape + v->num_dims(), offsets.begin(), counts.begin(), minus<long>());
-		delete shape;
+		delete [] shape;
 		if (count > 0)
 		{
 			counts[0] = count;
@@ -118,17 +124,18 @@ struct DataHeader
 {
 	//data
 	int numDims;
-	bimap<int, string> inputLabels;
-	bimap<int, string> targetLabels;
+	Vector<string> inputLabels;
+	map<string, int> inputLabelCounts;
+	Vector<string> targetLabels;
 	map<string, int> targetLabelCounts;
-	int inputSize;
-	int outputSize;
-	int numSequences;
-	int numTimesteps;
-	int totalTargetStringLength;
+	size_t inputSize;
+	size_t outputSize;
+	size_t numSequences;
+	size_t numTimesteps;
+	size_t totalTargetStringLength;
 
 	//functions
-	DataHeader(const string& filename, const string& task, double dataFraction):
+	DataHeader(const string& filename, const string& task, real_t dataFraction):
 		outputSize(0),
 		numTimesteps(0),
 		totalTargetStringLength(0)
@@ -142,8 +149,9 @@ struct DataHeader
 			numDims = 1;
 		}
 		inputSize = load_nc_dim(nc, "inputPattSize");
-		numSequences = load_nc_dim(nc, "numSeqs") * bound(dataFraction, 0.0, 1.0);
-		loop(int s, range(numSequences))
+		int maxSeqs = load_nc_dim(nc, "numSeqs");
+		numSequences =  bound((int)(dataFraction * maxSeqs), 1, maxSeqs);
+		LOOP(int s, span(numSequences))
 		{
 			vector<int> seqDims = get_nc_array_step<int>(nc, "seqDims", s, numDims != 1);
 			if (seqDims.empty())
@@ -151,13 +159,6 @@ struct DataHeader
 				seqDims = get_nc_array_step<int>(nc, "seqLengths", s);
 			}
 			numTimesteps += product(seqDims);
-		}
-		if (get_nc_string(nc, "inputLabels", 0, false) != "")
-		{
-			for (int i = 0; i < inputSize; ++i)
-			{
-				inputLabels.insert(bimap<int, string>::relation(i, get_nc_string(nc, "inputLabels", i)));
-			}
 		}
 		if (in(task, "regression"))
 		{
@@ -167,44 +168,84 @@ struct DataHeader
 		{
 			outputSize = inputSize;
 		}
-		else if (task == "classification" || task == "sequence_classification" || task == "transcription" || task == "dictionary_transcription")
+		else if (task == "classification" || task == "sequence_classification" || in(task, "transcription"))
 		{
 			outputSize = load_nc_dim(nc, "numLabels");
-			for (int i = 0; i < outputSize; ++i)
+		}
+		if (get_nc_string(nc, "inputLabels", 0, in(task, "discrete")) != "")
+		{
+			int numInputLabels = load_nc_dim(nc, "numInputLabels");
+			for (int i = 0; i < numInputLabels; ++i)
 			{
-				targetLabels.insert(bimap<int, string>::relation(i, get_nc_string(nc, "labels", i)));
+				string label = get_nc_string(nc, "inputLabels", i);
+				replace_all(label, "_", "-");
+				inputLabels += label;
+				inputLabelCounts[label] = 0;
+			}
+		}
+		for (int i = 0; i < outputSize; ++i)
+		{
+			string label = get_nc_string(nc, "labels", i);
+			if (label == "")
+			{
+				label = int_to_sortable_string(i, outputSize);
+			}
+			targetLabels += label;
+			targetLabelCounts[label] = 0;
+		}
+		if (in(task, "discrete"))
+		{	
+			vector<int> inputClasses;
+			load_nc_array(nc, "inputClasses", inputClasses);
+			LOOP(int c, inputClasses)
+			{
+				if (c >= 0)
+				{
+					check(in_range(inputLabels, c), "input class index " + str(c) + " not in range of input labels");
+					++inputLabelCounts[inputLabels[c]];
+				}
 			}
 		}
 		if (task == "classification")
 		{	
 			vector<int> targetClasses;
 			load_nc_array(nc, "targetClasses", targetClasses);
-			loop(int t, targetClasses)
+			LOOP(int c, targetClasses)
 			{
-				if (t >= 0)
+				if (c >= 0)
 				{
-					++targetLabelCounts[targetLabels.left.at(t)];
+					check(in_range(targetLabels, c), "target class index " + str(c) + " not in range of target alphabet");
+					++targetLabelCounts[targetLabels[c]];
 				}
 			}
 		}
-		else if (task == "sequence_classification" || task == "transcription" || task == "dictionary_transcription")
+		else if (find_nc_variable(nc, "targetStrings") && (task == "transcription" || task == "sequence_classification"))
 		{
-			loop(int i, range(outputSize))
+			LOOP(int s, span(numSequences))
 			{
-				targetLabelCounts[targetLabels.left.at(i)] = 0;
-			}
-			loop(int s, range(numSequences))
-			{
-				stringstream labelSeq (get_nc_string(nc, "targetStrings", s));
+				stringstream targetString (get_nc_string(nc, "targetStrings", s));
 				string label; 
-				while(labelSeq >> label)
+				while(targetString >> label)
 				{
-					check(in_right(targetLabels, label), "label \'" + label + "\' in \'" + labelSeq.str() + "\' not found in target labels");
-					++targetLabelCounts[label];
-					++totalTargetStringLength;
+					//check(in_right(targetLabels, label), "label \'" + label + "\' in \'" + targetString.str() + "\' not found in target alphabet");
+					if (warn_unless(in(targetLabels, label), "label \'" + label + "\' in \'" + targetString.str() + "\' not found in target alphabet"))
+					{
+						++targetLabelCounts[label];
+						++totalTargetStringLength;
+					}
+					if (task == "sequence_classification")
+					{
+						break;
+					}
 				}
 			}
-		}
+		}	
+		check(targetLabelCounts.size() == targetLabels.size(), 
+			  str(targetLabels.size()) + " target labels and " 
+			  + str(targetLabelCounts.size()) + " target label counts (should be equal)" );
+		check(inputLabelCounts.size() == inputLabels.size(), 
+			  str(inputLabels.size()) + " input labels and " 
+			  + str(inputLabelCounts.size()) + " input label counts (should be equal)" );
 	}
 	void print(ostream& out) const
 	{
@@ -220,15 +261,19 @@ struct DataHeader
 		{
 			prt_line(out);
 			out << targetLabels.size() << " target labels:" << endl;
-			for (BMISLCI it = targetLabels.left.begin(); it != targetLabels.left.end(); ++it)
+			LOOP (TIS t, enumerate(targetLabels))
 			{
-				out << (*it) << " (" << at(targetLabelCounts, it->second) << ")" << endl;
+				out << t << " (" << at(targetLabelCounts, t.get<1>()) << ")" << endl;
 			}
 		}
 		if (inputLabels.size())
 		{
 			prt_line(out);
-			out << "input labels:" << endl << inputLabels;
+			out << inputLabels.size() << " input labels:" << endl;
+			LOOP(TIS t, enumerate(inputLabels))
+			{
+				out << t << " (" << at(inputLabelCounts, t.get<1>()) << ")" << endl;
+			}
 		}
 		
 	}
@@ -253,15 +298,17 @@ struct NetcdfDataset
 	NcError err;
 
 	//functions
-	NetcdfDataset(const string& fname, const string& t, double fraction = 1.0):
+	NetcdfDataset(const string& fname, const string& t, real_t dataFraction = 1.0):
 		nc (fname.c_str(), NcFile::ReadOnly),
 		filename(fname),
 		task(t),
-		header(filename, task, fraction),
+		header(filename, task, dataFraction),
 		err(NcError::silent_nonfatal)
 	{
 		init();
-		load_sequences(0, bound(fraction, 0.0, 1.0) * load_dim("numSeqs"));
+		int maxSeqs = load_nc_dim(nc, "numSeqs");
+		int numSeqs =  bound((int)(dataFraction * maxSeqs), 1, maxSeqs);
+		load_sequences(0, numSeqs);
 	}
 	NetcdfDataset(const string& fname, const string& t, int seqNum):
 		nc (fname.c_str(), NcFile::ReadOnly),
@@ -303,10 +350,10 @@ struct NetcdfDataset
 	{
 		return *sequences.at(n);
 	}
-	int timesteps() const
+	size_t timesteps() const
 	{
-		int total = 0;
-		loop(const DataSequence* seq, sequences)
+		size_t total = 0;
+		LOOP(const DataSequence* seq, sequences)
 		{
 			total += seq->inputs.seq_size();
 		}
@@ -319,7 +366,7 @@ struct NetcdfDataset
 	pair<int,int> get_offset(int seqNum) const
 	{
 		pair<int, int> offset(0, 0);
-		loop(int i, range(seqNum))
+		LOOP(int i, span(seqNum))
 		{
 			offset += seq_to_offset(i);
 		}
@@ -328,7 +375,7 @@ struct NetcdfDataset
 	void load_sequences (int first, int last)
 	{
 		pair<int, int> offsets = get_offset(first);
-		loop(int i, range(first, last))
+		LOOP(int i, span(first, last))
 		{
 			check(i >= 0 && i < inputSeqDims.shape[0], "sequence " + str(i) + " requested from data file " + str(filename) + " containing " + str(inputSeqDims.shape[0]) + " sequences");
 			DataSequence* seq = new DataSequence(header.inputSize, in(task, "regression") ? header.outputSize : 0);
@@ -337,10 +384,10 @@ struct NetcdfDataset
 			vector<int> targetShape = flip(targetSeqDims[i]);
 			int targetCount = product(targetShape);
 			load_to_seq_buffer(seq->inputs, inputShape, "inputs", true, offsets.first, inputCount);
-// 			if (find_variable("importance"))
-// 			{
-// 				load_to_seq_buffer(seq->importance, targetShape, "importance", true, offsets.second, targetCount);
-// 			}
+ 			if (find_variable("importance"))
+ 			{
+ 				load_to_seq_buffer_with_depth(seq->importance, targetShape, 1, "importance", true, offsets.second, targetCount);
+ 			}
 			if (in(task, "regression"))
 			{
 				if (task == "sequence_regression")
@@ -351,15 +398,32 @@ struct NetcdfDataset
 			}
 			else if (task == "classification")
 			{
-				load_to_seq_buffer(seq->targetClasses, targetShape, "targetClasses", true, offsets.second, targetCount);
+				load_to_seq_buffer_with_depth(seq->targetClasses, targetShape, 1, "targetClasses", true, offsets.second, targetCount);
 			}
-			else if (task == "sequence_classification" || task == "transcription" || task == "dictionary_transcription")
+			else if (in(task, "discrete"))
 			{
-				seq->labelSeq = str_to_label_seq(get_string("targetStrings", i), header.targetLabels);
-				if (task == "sequence_classification")
+				load_to_seq_buffer_with_depth(seq->inputClasses, inputShape, 1, "inputClasses", true, offsets.second, inputCount);
+			}
+			else if (task == "sequence_classification")
+			{
+				if (find_variable("targetStrings"))
 				{
-					seq->targetClasses.get(list_of(0)) = seq->labelSeq[0];
+					seq->targetLabelSeq = str_to_label_seq(get_string("targetStrings", i), header.targetLabels);
+					seq->targetClasses.reshape_with_depth(empty_list_of<size_t>(), 1);
+					seq->targetClasses.get(list_of(0)) = seq->targetLabelSeq[0];
 				}
+				else
+				{
+					load_to_seq_buffer_with_depth(seq->targetClasses, empty_list_of<size_t>(), 1, "targetClasses", true, offsets.second, 1);
+				}
+			}
+			else if (in(task, "transcription"))
+			{
+				if (find_variable("wordTargetStrings"))
+				{
+					seq->targetWordSeq = split<string>(get_string("wordTargetStrings", i));
+				}
+				seq->targetLabelSeq = str_to_label_seq(get_string("targetStrings", i), header.targetLabels);				
 			}
 			seq->tag = get_string("seqTags", i, false);
 			sequences.push_back(seq);
@@ -389,6 +453,11 @@ struct NetcdfDataset
 		dest.reshape(shape);
 		return load_array(name, dest.data, required, offset, count);
 	}
+	template<class T, class R> bool load_to_seq_buffer_with_depth(SeqBuffer<T>& dest, const R& shape, int depth, const string& name, bool required = true, int offset = 0, int count = -1)
+	{
+		dest.reshape_with_depth(shape, depth);
+		return load_array(name, dest.data, required, offset, count);
+	}
 	template<class T> bool load_array(const string& name, vector<T>& dest, bool required = true, int offset = 0, int count = -1)
 	{
 		return load_nc_array<T>(nc, name, dest, required, offset, count);
@@ -413,20 +482,21 @@ struct DataList
 	//data
 	vector<string> filenames;
 	vector<DataHeader> headers;
-	map <string, double> targetLabelFrequencies;
+	map <string, real_t> inputLabelHits;
+	map <string, real_t> targetLabelCounts;
 	string task;
-	int numSequences;
-	int numTimesteps;
-	int totalTargetStringLength;
+	size_t numSequences;
+	size_t numTimesteps;
+	size_t totalTargetStringLength;
 	NetcdfDataset* dataset;
 	int datasetIndex;
 	DataSequence* seq;
 	int seqIndex;
-	double dataFraction;
+	real_t dataFraction;
 	bool shuffled;
 	
 	//functions
-	DataList(const vector<string>& filenams, const string& t, bool shuffle, double loadFrac):
+	DataList(const vector<string>& filenams, const string& t, bool shuffle, real_t loadFrac):
 	filenames(filenams),
 	task(t),
 	numSequences(0),
@@ -439,15 +509,16 @@ struct DataList
 	dataFraction(loadFrac),
 	shuffled(shuffle)
 	{
-		for (int i = 0; i < filenames.size(); ++i)
+		LOOP(TIS t, enumerate(filenames))
 		{
-			headers += DataHeader(filenames[i], task, loadFrac);
+			headers += DataHeader(t.get<1>(), task, loadFrac);
 			const DataHeader& curr = headers.back();
 			numSequences += curr.numSequences;
 			numTimesteps += curr.numTimesteps;
 			totalTargetStringLength += curr.totalTargetStringLength;
-			targetLabelFrequencies += curr.targetLabelCounts;
-			if (i)
+			targetLabelCounts += curr.targetLabelCounts;
+			inputLabelHits += curr.inputLabelCounts;
+			if (t.get<0>())
 			{
 				const DataHeader& prev = nth_last(headers, 2);
 				assert(prev.numDims == curr.numDims);
@@ -456,32 +527,38 @@ struct DataList
 				assert(prev.outputSize == curr.outputSize);
 			}
 		}
-		targetLabelFrequencies /= (double) sum_right(targetLabelFrequencies);
 	}
 	~DataList()
 	{
-		delete dataset;
+		delete_dataset();
 	}
-	void init()
+	void clear_seq()
 	{
+		seqIndex = -1;
+		seq = 0;
 	}
 	void delete_dataset()
 	{
-		seqIndex = -1;
 		delete dataset;
 		dataset = 0;
-		seq = 0;		
+		clear_seq();		
 	}
 	bool next_dataset()
 	{
-		delete_dataset();
+		if (dataset && filenames.size() > 1)
+		{
+			delete_dataset();
+		}
 		if (datasetIndex >= (int)last_index(filenames))
 		{
 			datasetIndex = -1;
 			return true;
 		}
 		++datasetIndex;
-		dataset = new NetcdfDataset(filenames[datasetIndex], task, dataFraction);
+		if(!dataset)
+		{ 
+			dataset = new NetcdfDataset(filenames[datasetIndex], task, dataFraction);
+		}
 		if (!dataset->size())
 		{
 			return next_dataset();
@@ -495,11 +572,15 @@ struct DataList
 	DataSequence* next_sequence()
 	{
 		bool finished = false;
-		if (!dataset || seqIndex >= (int)last_index(dataset->sequences))
+		if (datasetIndex < 0 || seqIndex >= (int)last_index(dataset->sequences))
 		{
 			finished = next_dataset();
 		}
-		if (!finished)
+		if (finished)
+		{
+			clear_seq();
+		}
+		else
 		{
 			++seqIndex;
 			seq = dataset->sequences[seqIndex];
@@ -509,7 +590,7 @@ struct DataList
 	DataSequence* start()
 	{
 		datasetIndex = -1;
-		delete_dataset();
+		clear_seq();
 		if (shuffled)
 		{
 			shuffle(filenames);
@@ -524,9 +605,9 @@ struct DataList
 	{
 		PRINT(numSequences, out);
 		PRINT(numTimesteps, out);
-		if(verbose)
+//		if(verbose)
 		{
-			out << "avg timesteps/seq = " << (double) numTimesteps / (double)numSequences << endl;
+			out << "avg timesteps/seq = " << (real_t) numTimesteps / (real_t)numSequences << endl;
 		}
 		if (dataFraction != 1)
 		{
@@ -535,26 +616,33 @@ struct DataList
 		out << filenames.size() << " filenames"<< endl;
 		print_range(out, filenames, string("\n"));
 		out << endl;
-		if (verbose)
+//		if (verbose)
 		{
 			out << "inputSize = " << headers.front().inputSize << endl;
 			out << "outputSize = " << headers.front().outputSize << endl;
 			out << "numDims = " << headers.front().numDims << endl;
 			PRINT(task, out);
 			PRINT(shuffled, out);
-			const bimap<int, string>& targetLabels = headers.front().targetLabels;
-			const bimap<int, string>& inputLabels = headers.front().inputLabels;
+			const vector<string>& targetLabels = headers.front().targetLabels;
+			const vector<string>& inputLabels = headers.front().inputLabels;
 			if (inputLabels.size())
 			{
+				int totalHits = sum_right(inputLabelHits); 
 				out << inputLabels.size() << " input labels" << endl;
-				out << inputLabels;
+				LOOP (TIS t, enumerate(inputLabels))
+				{
+					int hits = at(inputLabelHits, t.get<1>());
+					out << t << " (" << hits << " = " << (hits * 100.0) / totalHits << "%)" << endl;
+				}
 			}
 			if (targetLabels.size())
 			{
+				int totalHits = sum_right(targetLabelCounts); 
 				out << targetLabels.size() << " target labels" << endl;
-				for (BMISLCI it = targetLabels.left.begin(); it != targetLabels.left.end(); ++it)
+				LOOP (TIS t, enumerate(targetLabels))
 				{
-					out << (*it) << " (" << setprecision (3) << at(targetLabelFrequencies, it->second) * 100 << "%)" << endl;
+					int hits = at(targetLabelCounts, t.get<1>());
+					out << t << " (" << hits << " = " << (hits * 100.0) / totalHits << "%)" << endl;
 				}
 				PRINT(totalTargetStringLength, out);
 			}

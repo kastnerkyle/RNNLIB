@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -25,12 +25,14 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include <algorithm>
 #include <iterator>
 #include "Helpers.hpp"
+#include "String.hpp"
 
 using namespace std;
 
 struct ConfigFile
 {
 	//data
+	set<string> used;
 	map<string, string> params;
 	string filename;
 	
@@ -56,15 +58,29 @@ struct ConfigFile
 			}
 		}
 	}
-	bool has(const string& name)
+	bool contains(const string& name) const
 	{
 		return in(params, name);
 	}
-	template<class T> const T& set(const string& name, const T& val)
+	bool remove(const string& name)
+	{
+		if (contains(name))
+		{
+			params.erase(name);
+			used.erase(name);
+			return true;
+		}
+		return false;
+	}
+	template<class T> const T& set_val(const string& name, const T& val, bool valUsed = true)
 	{
 		stringstream ss;
 		ss << boolalpha << val;
 		params[name] = ss.str();
+		if (valUsed)
+		{
+			used.insert(name);
+		}
 		return val;
 	}
 	template<class T> T get(const string& name, const T& defaultVal)
@@ -72,50 +88,79 @@ struct ConfigFile
 		MSSI it = params.find(name);
 		if (it == params.end())
 		{	
-			set<T>(name, defaultVal);
+			set_val<T>(name, defaultVal);
 			return defaultVal;
 		}
 		return get<T>(name);
 	}
-	template<class T> T get(const string& name) const
+	template<class T> T get(const string& name)
 	{
 		MSSCI it = params.find(name);
-		if (it == params.end())
-		{	
-			cout << "param '" << name << "' not found in config file '" << filename << "', exiting" << endl;
-			exit(0);
-		}
+		check(it != params.end(), "param '" + name + "' not found in config file '" + filename);
+		used.insert(name);
 		return read<T>(it->second);
 	}
-	template<class T> vector<T> get_list(const string& name, const char delim = ',') const
+	template<class T> Vector<T> get_list(const string& name, const char delim = ',')
 	{
-		vector<T> vect;
+		Vector<T> vect;
 		MSSCI it = params.find(name);
 		if (it != params.end())
 		{
-			vect = split<T>(it->second, delim);
+			vect = split_with_repeat<T>(it->second, delim);
+			used.insert(name);
 		}
 		return vect;
 	}
-	template<class T> vector<T> get_list(const string& name, const T& defaultVal, size_t length, const char delim = ',') const
+	template<class T> Vector<T> get_list(const string& name, const T& defaultVal, size_t length, const char delim = ',')
 	{
-		vector<T> vect = get_list<T>(name, delim);
+		Vector<T> vect = get_list<T>(name, delim);
 		vect.resize(length, vect.size() == 1 ? vect.front() : defaultVal);
+		used.insert(name);
 		return vect;
 	}
-	template<class T> vector<vector<T> > get_array(const string& name, const char delim1 = ';', const char delim2 = ',') const
+	template<class T> Vector<Vector<T> > get_array(const string& name, const char delim1 = ';', const char delim2 = ',')
 	{
-		vector<vector<T> > vect;
+		Vector<Vector<T> > array;
 		MSSCI it = params.find(name);
 		if (it != params.end())
 		{
-			vector<string> lists = split<string>(it->second, delim1);
-			for (VSCI it = lists.begin(); it != lists.end(); ++it)
+			LOOP(const string& row, split<string>(it->second, delim1))
 			{
-				vect.push_back(split<T>(*it, delim2));
+				array += split_with_repeat<T>(row, delim2);
+			}
+			used.insert(name);
+		}
+		return array;
+	}
+	template<class T> Vector<Vector<T> > get_array(const string& name, const string& defaultStr, size_t length, const char delim1 = ';', const char delim2 = ',')
+	{
+		Vector<Vector<T> > array = get_array<T>(name, delim1, delim2);
+		array.resize(length, array.size() == 1 ? array.front() : split_with_repeat<T>(defaultStr, delim2));
+		used.insert(name);
+		return array;
+	}
+	void warn_unused(ostream& out, bool removeUnused = true)
+	{
+		Vector<string> unused;
+		LOOP(const PSS& p, params)
+		{
+			if (!in(used, p.first))
+			{
+				unused += p.first;
 			}
 		}
-		return vect;
+		if (unused.size())
+		{
+			LOOP(string& s, unused)
+			{
+				out << "WARNING: " << s << " in config but never used" << endl;
+				if (removeUnused)
+				{
+					params.erase(s);
+				}
+			}
+			out << endl;
+		}
 	}
 };
 

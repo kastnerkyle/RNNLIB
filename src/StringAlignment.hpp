@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves, 2005 Santiago Fernandez
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -19,14 +19,19 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #define _INCLUDED_StringAlignment_h 
 
 #include <vector>
+#include <map>
 #include <iostream>
+#include "Helpers.hpp"
 
 using namespace std;
 
-template<class T> struct StringAlignment
+template<class R1, class R2> struct StringAlignment
 {
 	//data
-	vector< vector<int> > matrix;
+	map<typename boost::range_value<R1>::type, map<typename boost::range_value<R1>::type, int> > subsMap;
+	map<typename boost::range_value<R1>::type, int> delsMap;
+	map<typename boost::range_value<R1>::type, int> insMap;
+	Vector<Vector<int> > matrix;
 	int substitutions;
 	int deletions;
 	int insertions;
@@ -34,49 +39,18 @@ template<class T> struct StringAlignment
 	int subPenalty;
 	int delPenalty;
 	int insPenalty;
-	int m;
-	int n;
+	size_t n;
+	size_t m;
 	
 	//functions
-	StringAlignment (const vector<T>& reference_sequence, const vector<T>& test_sequence, 
-					 bool backtrace = true, int sp = 1, int dp = 1, int ip = 1):
+	StringAlignment (const R1& reference_sequence, const R2& test_sequence, 
+					 bool trackErrors = false, bool backtrace = true, int sp = 1, int dp = 1, int ip = 1):
 		subPenalty(sp),
 		delPenalty(dp),
 		insPenalty(ip),
-		m(0),
-		n(0)
+		n(reference_sequence.size()),
+		m(test_sequence.size())
 	{
-		// Levenshtein distance
-		// by Anders Sewerin Johansen (http://www.merriampark.com/ldcpp.htm)
-		// with minor additions/modifications
-		// Step 1
-		alignStrings(reference_sequence, test_sequence, backtrace);
-	}
-	~StringAlignment(){}
-	void allocateMemory (int refSeqSize, int testSeqSize)
-	{
-		n = refSeqSize;
-		m = testSeqSize;
-		if (n != 0 && m != 00)
-		{
-			matrix.resize(n+1);
-			
-			// Size the vectors in the 2.nd dimension. Unfortunately C++ doesn't
-			// allow for allocation on declaration of 2.nd dimension of vec of vec
-			for (int i = 0; i <= n; i++) 
-			{
-				matrix[i].resize(m+1);
-			}
-		}
-	}
-	int alignStrings (const vector<T>& reference_sequence,const vector<T>& test_sequence, bool backtrace)
-	{
-		const int refSeqSize = (int)reference_sequence.size();
-		const int testSeqSize = (int)test_sequence.size();
-		if (refSeqSize != n || testSeqSize != m)
-		{
-			allocateMemory(refSeqSize, testSeqSize);
-		}
 		if (n == 0)
 		{
 			substitutions = 0;
@@ -93,51 +67,30 @@ template<class T> struct StringAlignment
 		}
 		else
 		{
-			typedef std::vector< std::vector<int> > Tmatrix; 
-			Tmatrix matrix(n+1);
-			
-			// Size the vectors in the 2.nd dimension. Unfortunately C++ doesn't
-			// allow for allocation on declaration of 2.nd dimension of vec of vec
-			for (int i = 0; i <= n; i++) 
+			//initialise the matrix
+			matrix.resize(n+1);
+			LOOP(Vector<int>& v, matrix)
 			{
-				matrix[i].resize(m+1);
+				v.resize(m+1);
+				fill(v, 0);
 			}
-			
-			// Step 2
-			for (int i = 0; i <= n; i++) 
+			LOOP (int i, span(n+1)) 
 			{
 				matrix[i][0]=i;
 			}
-			
-			for (int j = 0; j <= m; j++) 
+			LOOP (int j, span(m+1)) 
 			{
 				matrix[0][j]=j;
 			}
 			
-			// Step 3
-			for (int i = 1; i <= n; i++) 
-			{
-				const T s_i = reference_sequence[i-1];
-				
-				// Step 4
-				for (int j = 1; j <= m; j++) 
+			//calculate the insertions, substitutions and deletions
+			LOOP (int i, span(1, n + 1))
+			{	
+				const typename boost::range_value<R1>::type& s_i = reference_sequence[i-1];
+				LOOP (int j, span(1, m + 1))
 				{
-					const T t_j = test_sequence[j-1];
-					
-					// Step 5
-					
-					int cost;
-					if (s_i == t_j)
-					{
-						cost = 0;
-					}
-					else
-					{
-						cost = 1;
-					}
-					
-					// Step 6
-					
+					const typename boost::range_value<R2>::type& t_j = test_sequence[j-1];
+					int cost = ((s_i == t_j) ? 0 : 1);
 					const int above = matrix[i-1][j];
 					const int left = matrix[i][j-1];
 					const int diag = matrix[i-1][j-1];
@@ -145,31 +98,15 @@ template<class T> struct StringAlignment
 										 min(left + 1,			// insertion
 											 diag + cost));		// substitution
 					
-					// Step 6A: Cover transposition, in addition to deletion,
-					// insertion and substitution. This step is taken from:
-					// Berghel, Hal ; Roach, David : "An Extension of Ukkonen's 
-					// Enhanced Dynamic Programming ASM Algorithm"
-					// (http://www.acm.org/~hlb/publications/asm/asm.html)
 					matrix[i][j]=cell;
 				}
 			}
 			
 			//N.B sub,ins and del penalties are all set to 1 if backtrace is ignored
 			if (backtrace)
-			{
-				// Step 7
-				// Usually, there are many possible alignments with the same
-				// Levenshtein distance. Each one of them involves a different
-				// number of substitutions, deletions or insertions to transform
-				// one sequence into the other. We consider only one of the possible
-				// transformations.
-				//
-				// Using pseudo-code from:
-				// http://www-igm.univ-mlv.fr/~lecroq/seqcomp/seqcomp.ps.gz
-				// with minor additions/modifications
-				
-				std::vector<int>::size_type i = n;
-				std::vector<int>::size_type j = m;
+			{				
+				size_t i = n;
+				size_t j = m;
 				substitutions = 0;
 				deletions = 0;
 				insertions = 0;
@@ -184,43 +121,56 @@ template<class T> struct StringAlignment
 					}
 					else if (matrix[i][j] == matrix[i-1][j-1] + 1)
 					{
+						if (trackErrors)
+						{
+							++subsMap[reference_sequence[i]][test_sequence[j]];
+						}
 						++substitutions;
 						--i;
 						--j;
 					}
 					else if (matrix[i][j] == matrix[i-1][j] + 1)
 					{
+						if (trackErrors)
+						{
+							++delsMap[reference_sequence[i]];
+						}
 						++deletions;
 						--i;
 					}
 					else 
 					{
+						if (trackErrors)
+						{
+							++insMap[test_sequence[j]];
+						}
 						++insertions;
 						--j;
 					}
 				}
-				
-				while (i != 0) 
+				while (i != 0)
 				{
+					if (trackErrors)
+					{
+						++delsMap[reference_sequence[i]];
+					}
 					++deletions;
 					--i;
 				}
-				
 				while (j != 0) 
 				{
+					if (trackErrors)
+					{
+						++insMap[test_sequence[j]];
+					}
 					++insertions;
 					--j;
 				}
 				
 				// Sanity check:
-				if ((substitutions + deletions + insertions) != matrix[n][m]) 
-				{
-					std::cout <<
-					"Found path with distance " <<
-					substitutions + deletions + insertions <<
-					" but Levenshtein distance is " <<
-					matrix[n][m] << std::endl;
-				}
+				check((substitutions + deletions + insertions) == matrix[n][m], 
+					  "Found path with distance " + str(substitutions + deletions + insertions) + 
+					  " but Levenshtein distance is " + str(matrix[n][m])); 
 				
 				//scale individual errors by penalties
 				distance = (subPenalty*substitutions) + (delPenalty*deletions) + (insPenalty*insertions);
@@ -230,8 +180,8 @@ template<class T> struct StringAlignment
 				distance = matrix[n][m];
 			}
 		}
-		return distance;
 	}
+	~StringAlignment(){}
 };
 
 #endif

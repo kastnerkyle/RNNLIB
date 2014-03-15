@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -46,28 +46,28 @@ struct BlockLayer: public Layer
 		display(this->outputActivations, "activations");
 		display(this->outputErrors, "errors");
 	}
-	virtual void print(ostream& out = cout) const
+	void print(ostream& out = cout) const
 	{
 		Layer::print(out);
 		out << " block " << blockShape;
 	}
-	virtual void start_sequence()
+	void start_sequence()
 	{	
 		for (int i = 0; i < outSeqShape.size(); ++i)
 		{
-			outSeqShape.at(i) = ceil((double)this->source->output_seq_shape().at(i) / (double)blockShape.at(i));
+			outSeqShape.at(i) = ceil((real_t)this->source->output_seq_shape().at(i) / (real_t)blockShape.at(i));
 		}
 		outputActivations.reshape(outSeqShape, 0);
-		outputErrors.reshape(outSeqShape, 0);
+		outputErrors.reshape(outputActivations, 0);
 	} 
-	virtual void feed_forward(const vector<int>& outCoords)
+	void feed_forward(const vector<int>& outCoords)
 	{
-		double* outIt = this->outputActivations[outCoords].begin();
+		real_t* outIt = this->outputActivations[outCoords].begin();
 		range_multiply(blockOffset, outCoords, blockShape);
 		for (blockIterator.begin(); !blockIterator.end; ++blockIterator)
 		{
 			range_plus(inCoords, *blockIterator, blockOffset);
-			View<double> inActs = this->source->outputActivations.at(inCoords);
+			View<real_t> inActs = this->source->outputActivations.at(inCoords);
 			if (inActs.begin())
 			{
 				copy(inActs.begin(), inActs.end(), outIt);
@@ -79,17 +79,17 @@ struct BlockLayer: public Layer
 			outIt += sourceSize;
 		}
 	}
-	virtual void feed_back(const vector<int>& outCoords)
+	void feed_back(const vector<int>& outCoords)
 	{
-		const double* outIt = this->outputErrors[outCoords].begin();
+		const real_t* outIt = this->outputErrors[outCoords].begin();
 		range_multiply(blockOffset, outCoords, blockShape);
 		for (blockIterator.begin(); !blockIterator.end; ++blockIterator)
 		{
 			range_plus(inCoords, *blockIterator, blockOffset);
-			double* inErr = this->source->outputErrors.at(inCoords).begin();
+			real_t* inErr = this->source->outputErrors.at(inCoords).begin();
 			if (inErr)
 			{
-				transform(outIt, outIt + sourceSize, inErr, inErr, plus<double>());
+				transform(outIt, outIt + sourceSize, inErr, inErr, plus<real_t>());
 			}
 			outIt += sourceSize;
 		}

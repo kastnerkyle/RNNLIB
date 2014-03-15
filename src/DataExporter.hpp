@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -27,8 +27,6 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 
 #define SAVE(x) (save (x, #x))
 #define DISPLAY(x) (display (x, #x))
-
-extern bool verbose;
 
 struct Val
 {
@@ -109,10 +107,10 @@ template <typename T> struct SeqBufferVal: public Val
 {
 	//data
 	const SeqBuffer<T>& array;
-	const bimap<int, string>* labels;
+	const vector<string>* labels;
 	
 	//functions
-	SeqBufferVal(const SeqBuffer<T>& a, const bimap<int, string>* labs = 0):
+	SeqBufferVal(const SeqBuffer<T>& a, const vector<string>* labs = 0):
 		array(a),
 		labels(labs)
 	{}
@@ -122,12 +120,9 @@ template <typename T> struct SeqBufferVal: public Val
 		{
 			if (labels)
 			{
-				out << "LABELS:";
-				for (int i = 0; i < labels->size(); ++i)
-				{
-					out << " " << labels->left.at(i);
-				} 
-				out << endl;
+				out << "LABELS: " << *labels << endl;
+//				print_range(out, *labels);
+//				out << endl;
 			}
 			out << array;
 		}
@@ -192,17 +187,18 @@ struct DataExporter: public Named
 	}
 	bool load(ConfigFile& conf, ostream& out = cout)
 	{
-		loop(PSPV& val, saveVals)
+		LOOP(PSPV& val, saveVals)
 		{
-			string lookup = name + "_" + val.first;
+			string lookupName = name + "_" + val.first;
+			string displayName = name + "." + val.first;
 			if (verbose)
 			{
-				out << "loading "<< name << "." << val.first << endl;
+				out << "loading "<< displayName << endl;
 			}
-			map<string, string>::iterator stringIt = conf.params.find(lookup);
+			map<string, string>::iterator stringIt = conf.params.find(lookupName);
 			if (stringIt == conf.params.end())
 			{
-				out << "WARNING: unable to find '" << val.first << "'" << endl;
+				out << "WARNING: unable to find '" << displayName << "'" << endl;
 			}
 			else
 			{
@@ -214,23 +210,34 @@ struct DataExporter: public Named
 				}
 				else
 				{
-					out << "WARNING: unable to load '" << val.first << "'" << endl;
+					out << "WARNING: unable to load '" << displayName << "'" << endl;
 					return false;
 				}
 			}
 		}
 		return true;
 	}
+	void delete_val(map<string, Val*>& vals, const string& name)
+	{
+		if (in(vals, name))
+		{
+			delete vals[name];
+			vals.erase(name);
+		}
+	}
 	template<typename T> void save(T& param, const string& name)
 	{
+		delete_val(saveVals, name);
 		saveVals[name] = new ParamVal<T>(param);
 	}
 	template<typename R> void save_range(const R& range, const string& name)
 	{
+		delete_val(saveVals, name);
  		saveVals[name] = new RangeVal<R>(range);
 	}
-	template <typename T> void display(const SeqBuffer<T>& array, const string& name, const bimap<int, string>* labels = 0)
+	template <typename T> void display(const SeqBuffer<T>& array, const string& name, const vector<string>* labels = 0)
 	{
+		delete_val(displayVals, name);
 		displayVals[name] = new SeqBufferVal<T>(array, labels);
 	}
 };

@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -29,23 +29,22 @@ struct Rprop: public DataExporter, public Optimiser
 {
 	//data
 	ostream& out;
-	vector<double> deltas;
-	vector<double> prevDerivs;
-	double etaChange;
-	double etaMin;
-	double etaPlus;
-	double minDelta;
-	double maxDelta;
-	double initDelta;
-	double prevAvgDelta;
+	vector<real_t> deltas;
+	vector<real_t> prevDerivs;
+	real_t etaChange;
+	real_t etaMin;
+	real_t etaPlus;
+	real_t minDelta;
+	real_t maxDelta;
+	real_t initDelta;
+	real_t prevAvgDelta;
 	bool online;
-	vector<double>& derivs;
-	vector<double>& wts;
-	vector<double>& plasts;
 
 	//functions
-	Rprop(ostream& o, bool on = false, const string& name = "optimiser"):
+	Rprop(const string& name, ostream& o, vector<real_t>& weights, vector<real_t>& derivatives, 
+			bool on = false):
 		DataExporter(name),
+		Optimiser(weights, derivatives),
 		out(o),
 		etaChange(0.01),
 		etaMin(0.5),
@@ -54,10 +53,7 @@ struct Rprop: public DataExporter, public Optimiser
 		maxDelta(0.2),
 		initDelta(0.01),
 		prevAvgDelta(0),
-		online(on),
-		derivs(WeightContainer::instance().derivatives),
-		wts(WeightContainer::instance().weights),
-		plasts(WeightContainer::instance().plasticities)
+		online(on)
 	{
 		if (online)
 		{
@@ -71,60 +67,35 @@ struct Rprop: public DataExporter, public Optimiser
 		assert(wts.size() == derivs.size());
 		assert(wts.size() == deltas.size());
 		assert(wts.size() == prevDerivs.size());
-		loop(TDDDDD t, zip(wts, deltas, derivs, prevDerivs, plasts))
+		LOOP (int i, indices(wts))
 		{
-			double& wt = t.get<0>();			
-			double& delta = t.get<1>();
-			double& deriv = t.get<2>();
-			double& prevDeriv = t.get<3>();
-			double plast = t.get<4>();
-			double derivTimesPrev =  deriv * prevDeriv;
+			real_t deriv = derivs[i];
+			real_t delta = deltas[i];
+			real_t derivTimesPrev =  deriv * prevDerivs[i];
 			if(derivTimesPrev > 0)
 			{
-				delta = plast * bound(delta * etaPlus, minDelta, maxDelta);
-				wt -= sign(deriv) * delta;
-				prevDeriv = deriv;
+				deltas[i] = bound(delta * etaPlus, minDelta, maxDelta);
+				wts[i] -= sign(deriv) * delta;
+				prevDerivs[i] = deriv;
 			}
 			else if(derivTimesPrev < 0)
 			{
-				delta = plast * bound(delta * etaMin, minDelta, maxDelta);
-				prevDeriv = 0;
+				deltas[i] = bound(delta * etaMin, minDelta, maxDelta);
+				prevDerivs[i] = 0;
 			}
 			else
 			{
-				wt -= sign(deriv) * plast * delta;
-				prevDeriv = deriv;
+				wts[i] -= sign(deriv) * delta;
+				prevDerivs[i] = deriv;
 			}
 		}
-//		for (int i = 0; i < wts.size(); ++i)
-//		{
-//			double deriv = derivs[i];
-//			double delta = deltas[i];
-//			double derivTimesPrev =  deriv * prevDerivs[i];
-//			if(derivTimesPrev > 0)
-//			{
-//				deltas[i] = bound(delta * etaPlus, minDelta, maxDelta);
-//				wts[i] -= sign(deriv) * delta;
-//				prevDerivs[i] = deriv;
-//			}
-//			else if(derivTimesPrev < 0)
-//			{
-//				deltas[i] = bound(delta * etaMin, minDelta, maxDelta);
-//				prevDerivs[i] = 0;
-//			}
-//			else
-//			{
-//				wts[i] -= sign(deriv) * delta;
-//				prevDerivs[i] = deriv;
-//			}
-//		}
 		//use eta adaptations for online training (from Mike Schuster's thesis)
 		if (online)	
 		{
- 			double avgDelta = mean(deltas);
+ 			real_t avgDelta = mean(deltas);
 			if (avgDelta > prevAvgDelta)
 			{
-				etaPlus = max (1.0, etaPlus - etaChange);
+				etaPlus = max ((real_t)1.0, etaPlus - etaChange);
 			}
 			else
 			{
@@ -149,8 +120,8 @@ struct Rprop: public DataExporter, public Optimiser
 			prevDerivs.resize(wts.size());
 			fill(deltas, initDelta);
 			fill(prevDerivs, 0);
-			WeightContainer::instance().save_by_conns(deltas, "deltas");
-			WeightContainer::instance().save_by_conns(prevDerivs, "prevDerivs");
+            WeightContainer::instance().save_by_conns(deltas, ((name == "optimiser") ? "" : name + "_") + "deltas");
+            WeightContainer::instance().save_by_conns(prevDerivs, ((name == "optimiser") ? "" : name + "_") + "prevDerivs");
 		}
 	}
 	void print(ostream& out = cout) const

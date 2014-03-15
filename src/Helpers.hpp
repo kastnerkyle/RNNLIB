@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -30,6 +30,9 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include <boost/algorithm/minmax_element.hpp>
 #include <boost/bimap.hpp>
 #include <boost/foreach.hpp>
+#include <boost/math/distributions.hpp>
+#include <boost/assign/list_of.hpp>
+#include <boost/range/irange.hpp>
 #include <math.h>
 #include <numeric>
 #include <utility>
@@ -44,7 +47,7 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include <iterator>
 #include <map>
 #include <assert.h>
-#include "list_of.hpp"
+#include "Log.hpp"
 
 using namespace std;
 using namespace boost;
@@ -52,13 +55,31 @@ using namespace boost::assign;
 using namespace boost::posix_time;
 using namespace boost::gregorian;
 
-#define loop BOOST_FOREACH
-#define loop_back BOOST_REVERSE_FOREACH
+#define LOOP BOOST_FOREACH
+#define LOOP_BACK BOOST_REVERSE_FOREACH
+#define DO(x, y) BOOST_FOREACH(BOOST_TYPEOF(*((y).begin()))& (x), (y))
+#define DOC(x, y) BOOST_FOREACH(const BOOST_TYPEOF(*((y).begin()))& (x), (y))
+#define OD(x, y) BOOST_REVERSE_FOREACH(BOOST_TYPEOF(*((y).begin()))& (x), (y))
+#define COD(x, y) BOOST_REVERSE_FOREACH(const BOOST_TYPEOF(*((y).begin()))& (x), (y))
+#define REPEAT(n) for(int REPEAT_VARn = 0; REPEAT_VARn < (n); ++REPEAT_VARn)
+#define FROM(i, m, n) for(int (i) = (m); (i) < (n); ++(i))
+#define MORF(i, m, n) for(int (i) = (n)-1; (i) >= (m); --(i))
+#define FOR(i, n) for(int (i) = 0; (i) < (n); ++(i))
+#define ROF(i, n) for(int (i) = (n)-1; (i) >= 0; --(i))
+
+//#define FLOAT_REALS
+
+#ifdef FLOAT_REALS
+typedef float real_t;
+#else
+typedef double real_t;
+#endif
+
 
 typedef vector<size_t>::const_iterator VSTCI;
-typedef vector<double>::iterator VDI;
-typedef vector<double>::const_iterator VDCI;
-typedef vector<double>::reverse_iterator VDRI;
+typedef vector<real_t>::iterator VDI;
+typedef vector<real_t>::const_iterator VDCI;
+typedef vector<real_t>::reverse_iterator VDRI;
 typedef string::iterator SI;
 typedef string::const_iterator SCI;
 typedef vector<int>::iterator VII;
@@ -68,59 +89,65 @@ typedef vector<int>::reverse_iterator VIRI;
 typedef vector<vector<int> >::reverse_iterator VVIRI;
 typedef vector<int>::const_iterator VICI;
 typedef vector<bool>::iterator VBI;
-typedef vector<float>::iterator VFI;
-typedef vector<float>::const_iterator VFCI;
-typedef vector<vector<double> >::iterator VVDI;
-typedef vector<vector<double> >::const_iterator VVDCI;
+typedef vector<real_t>::iterator VFI;
+typedef vector<real_t>::const_iterator VFCI;
+typedef vector<vector<real_t> >::iterator VVDI;
+typedef vector<vector<real_t> >::const_iterator VVDCI;
 typedef vector<vector<int> >::iterator VVII;
 typedef vector<vector<int> >::const_iterator VVICI;
 typedef vector<unsigned int>::iterator VUII;
-typedef vector<vector<float> >::iterator VVFI;
+typedef vector<vector<real_t> >::iterator VVFI;
 typedef map<string, string>::iterator MSSI;
 typedef map<string, string>::const_iterator MSSCI;
-typedef map<string, double>::iterator MSDI;
-typedef map<string, double>::const_iterator MSDCI;
-typedef map<string, pair<int,double> >::iterator MSPIDI;
-typedef map<string, pair<int,double> >::const_iterator MSPIDCI;
-typedef vector< map<string, pair<int,double> > >::const_iterator VMSDCI;
-typedef vector<map<string, pair<int,double> > >::iterator VMSDI;
-typedef vector<map<string, pair<int,double> > >::reverse_iterator VMSDRI;
+typedef map<string, real_t>::iterator MSDI;
+typedef map<string, real_t>::const_iterator MSDCI;
+typedef map<string, pair<int,real_t> >::iterator MSPIDI;
+typedef map<string, pair<int,real_t> >::const_iterator MSPIDCI;
+typedef vector< map<string, pair<int,real_t> > >::const_iterator VMSDCI;
+typedef vector<map<string, pair<int,real_t> > >::iterator VMSDI;
+typedef vector<map<string, pair<int,real_t> > >::reverse_iterator VMSDRI;
 typedef map<string, int>::iterator MSII;
 typedef map<string, int>::const_iterator MSICI;
 typedef map<int, int>::iterator MIII;
 typedef map<int, int>::const_iterator MIICI;
 typedef vector<vector<int> >::const_reverse_iterator VVIRCI;
 typedef vector<int>::const_reverse_iterator VIRCI;
-typedef vector<const float*>::const_iterator VPCFCI;
-typedef vector<const float*>::iterator VPCFI;
-typedef vector<const float*>::const_reverse_iterator VPCFCRI;
+typedef vector<const real_t*>::const_iterator VPCFCI;
+typedef vector<const real_t*>::iterator VPCFI;
+typedef vector<const real_t*>::const_reverse_iterator VPCFCRI;
 typedef vector<bool>::const_iterator VBCI;
 typedef vector<bool>::iterator VBI;
-typedef map <string, pair<double, int> >::iterator MCSPDII;
-typedef map <string, pair<double, int> >::const_iterator MCSPDICI;
+typedef map <string, pair<real_t, int> >::iterator MCSPDII;
+typedef map <string, pair<real_t, int> >::const_iterator MCSPDICI;
 typedef bimap<int, string>::left_const_iterator BMISLCI;
 typedef bimap<int, string>::right_const_iterator BMISRCI;
 typedef bimap<int, string>::relation BMISR;
-typedef pair<string, double> PSD;
+typedef pair<string, real_t> PSD;
 typedef pair<int, int> PII;
-typedef pair<const string, double> PCSD;
+typedef pair<const string, real_t> PCSD;
 typedef pair<string, int> PSI;
+typedef pair<int, string> PIS;
 typedef pair<string, string> PSS;
-typedef const tuple<double&, double&, double&, double&>& TDDDD;
-typedef const tuple<double&, double&, double&, double&, double&>& TDDDDD;
-typedef const tuple<double&, double&, double&>& TDDD;
-typedef const tuple<double&, double&, int&>& TDDI;
-typedef const tuple<double&, double&, float&>& TDDF;
-typedef const tuple<double&, double&, float>& TDDCF;
-typedef const tuple<double&, double&>& TDD;
-typedef const tuple<string, int>& TSI;
+typedef const tuple<real_t&, real_t&, real_t&, real_t&>& TDDDD;
+typedef const tuple<real_t&, real_t&, real_t&, real_t&, real_t&>& TDDDDD;
+typedef const tuple<real_t&, real_t&, real_t&>& TDDD;
+typedef const tuple<real_t&, real_t&, int&>& TDDI;
+typedef const tuple<real_t&, real_t&, real_t&>& TDDF;
+typedef const tuple<real_t&, real_t&, real_t>& TDDCF;
+typedef const tuple<real_t&, real_t&>& TDD;
+typedef const tuple<int, string>& TIS;
 typedef const tuple<int, int>& TII;
+typedef const tuple<int, real_t>& TID;
 typedef const tuple<int, set<int>&>& TISETI;
+typedef const tuple<int&, bool, int>& TIBI;
+typedef const tuple<real_t, Log<real_t>& >& TDL;
+typedef const tuple<real_t&, Log<real_t>, Log<real_t> >& TDLL;
+typedef Log<real_t> prob_t;
 
 //global variables
-static const double doubleMax = numeric_limits<double>::max();
-static const double doubleMin = numeric_limits<double>::min();
-static const double infinity = numeric_limits<double>::infinity();
+static const real_t realMax = numeric_limits<real_t>::max();
+static const real_t realMin = numeric_limits<real_t>::min();
+static const real_t infinity = numeric_limits<real_t>::infinity();
 static bool runningGradTest = false;
 static bool verbose = false;
 static ostream& COUT = cout;
@@ -129,12 +156,13 @@ static ostream& COUT = cout;
 #define PRINTN(x, o) (o) << boolalpha << #x ":" << endl; print_range((o), (x), string("\n")); (o) << endl
 #define PRT(x) PRINT(x, cout)
 #define PRTN(x) PRINTN(x, cout)
-#define PRINTR(x, o) (o) << boolalpha << #x " = "; print_range((o), (x)); (o) << endl
-#define PRTR(x) PRINTR(x, cout)
-#define check(condition, str)  if(!(condition)) {cout << "ERRROR: " << (str) << endl; assert((condition));}
+#define PRINTR(x, o, d) (o) << boolalpha << #x " = "; print_range((o), (x), str(d)); (o) << endl
+#define PRTR(x, d) PRINTR((x), cout, (d))
+#define check(condition, str)  if(!(condition)) {cout << endl << "ERRROR: " << (str) << endl << endl; (assert((condition)));}
+#define CHECK_STRICT(condition, str) if(!(condition)) {cout << endl << "ERRROR: " << (str) << endl << endl; (assert((condition))); exit(0);}
 
 //MISC FUNCTIONS
-static bool warn (bool condition, ostream& out, const string& str)
+static bool warn_unless (bool condition, const string& str, ostream& out = cout)
 {
 	if (!condition)
 	{
@@ -142,7 +170,7 @@ static bool warn (bool condition, ostream& out, const string& str)
 	}
 	return condition;
 }
-static void print_time(double totalSeconds, ostream& out = cout, bool abbrv = false)
+static void print_time(real_t totalSeconds, ostream& out = cout, bool abbrv = false)
 {
 	int wholeSeconds = floor(totalSeconds);
 	int seconds = wholeSeconds % 60;
@@ -226,19 +254,39 @@ template<class T> static string str(const T& t)
 	return ss.str();
 //	return lexical_cast<string>(t);
 }
-template<class T> static double dbl(const T& t)
+template<class T> static real_t real(const T& t)
 {
-	return lexical_cast<double>(t);
+	return lexical_cast<real_t>(t);
 }
-template<class T> static double flt(const T& t)
-{
-	return lexical_cast<float>(t);
-}
-template<class T> static double integer(const T& t)
+template<class T> static int integer(const T& t)
 {
 	return lexical_cast<int>(t);
 }
+template<class T> static size_t natural(const T& t)
+{
+	return lexical_cast<size_t>(t);
+}
 //GENERIC RANGE OPERATIONS
+template<class R> static void flood(R& r, size_t size, const typename boost::range_value<R>::type& v = 0)
+{
+	r.resize(size);
+	fill(r, v);
+}
+template <class R, class T> static typename range_iterator<R>::type find(R& r, const T& t)
+{
+	return find(boost::begin(r), boost::end(r), t);
+}
+template <class R1, class R2> static vector<typename boost::range_value<R1>::type>& select_channels(const R1& r, const R2& channels)
+{
+	static vector<typename boost::range_value<R1>::type> v;
+	v.clear();
+	LOOP(int i, channels)
+	{
+		check(in_range(r, i), "channel " + str(i) + " in\n  " + str(channels) + "\nout of bounds for range\n" + str(r));
+		v += r[i];
+	}
+	return v;
+}
 template <class R> static size_t count_adjacent(const R& r)
 {
 	size_t count = 0;
@@ -280,35 +328,62 @@ zip(R1& r1, R2& r2, R3& r3, R4& r4, R5& r5)
 	return make_pair(make_zip_iterator(make_tuple(boost::begin(r1), boost::begin(r2), boost::begin(r3), boost::begin(r4), boost::begin(r5))), 
 					 make_zip_iterator(make_tuple(boost::end(r1) - (boost::size(r1) - size), boost::end(r2) - (boost::size(r2) - size), boost::end(r3) - (boost::size(r3) - size), boost::end(r4) - (boost::size(r4) - size), boost::end(r5) - (boost::size(r5) - size))));
 }
-template <class R> static pair<counting_iterator<typename range_difference<R>::type>, counting_iterator<typename range_difference<R>::type> > indices(const R& r)
+//template <class T1, class T2> static pair<counting_iterator<T2>, counting_iterator<T2> > span(const T1& t1, const T2& t2)
+template <class T1, class T2> static integer_range<T2> span(T1 t1, T2 t2)
 {
-	return range(boost::size(r));
+    return irange<T2>((t1 < t2 ? static_cast<T2>(t1) : t2), t2);
+	//return make_pair(counting_iterator<T2>(t1 < t2 ? static_cast<T2>(t1) : t2), counting_iterator<T2>(t2));
 }
-template <class R> static pair<zip_iterator<tuple<typename range_iterator<R>::type, counting_iterator<typename range_difference<R>::type> > >,
-								zip_iterator<tuple<typename range_iterator<R>::type, counting_iterator<typename range_difference<R>::type> > > >
+//template <class T> static pair<counting_iterator<T>, counting_iterator<T> > span(const T& t)
+template <class T> static integer_range<T> span(T t)
+{
+    return span(0, t);
+    //	return make_pair(counting_iterator<T>(0), counting_iterator<T>(t));
+}
+//template <class R> static pair<counting_iterator<typename range_difference<R>::type>, counting_iterator<typename range_difference<R>::type> > indices(const R& r)
+template <class R> static integer_range<typename boost::range_size<R>::type> indices(const R& r)
+{
+	return span(boost::size(r));
+}
+template <class R> static pair<zip_iterator<tuple<counting_iterator<typename range_difference<R>::type>, typename range_iterator<R>::type> >,
+								zip_iterator<tuple<counting_iterator<typename range_difference<R>::type>, typename range_iterator<R>::type> > >
 enumerate(R& r)
 {
-	return make_pair(make_zip_iterator(make_tuple(boost::begin(r), counting_iterator<typename range_difference<R>::type>(0))), 
-					make_zip_iterator(make_tuple(boost::end(r), counting_iterator<typename range_difference<R>::type>(boost::size(r)))));
+	return make_pair(make_zip_iterator(make_tuple(counting_iterator<typename range_difference<R>::type>(0), boost::begin(r))), 
+					make_zip_iterator(make_tuple(counting_iterator<typename range_difference<R>::type>(boost::size(r)), boost::end(r))));
 }
-template <class T> static pair<counting_iterator<T>, counting_iterator<T> > range(const T& t)
+template <class T1, class T2> static vector<T1> iota(const T2& t)
 {
-	return make_pair(counting_iterator<T>(0), counting_iterator<T>(t));
+	vector<T1> v;
+	LOOP(const T2& val, span(t))
+	{
+		v += lexical_cast<T1>(val);
+	}
+	return v;
 }
-template <class T> static pair<counting_iterator<T>, counting_iterator<T> > range(const T& t1, const T& t2)
+template <class T1, class T2> static vector<T1> iota(const T2& t1, const T2& t2)
 {
-	return make_pair(counting_iterator<T>(t1), counting_iterator<T>(t2));
+	vector<T1> v;
+	LOOP(const T2& val, span(t1, t2))
+	{
+		v += lexical_cast<T1>(val);
+	}
+	return v;
 }
-template <class R1, class R2, class F> static typename range_iterator<R2>::type transform(const R1& r1, R2& r2, F f)
+template <class R1, class R2, class F> static typename range_iterator<R2>::type transform(const R1& r1, R2& r2, const F& f)
 {
 	return transform(boost::begin(r1), boost::end(r1), boost::begin(r2), f);
 }
+template <class R> static bool in_range(R& r, size_t n)
+{
+	return n >= 0 && n < boost::size(r);
+}
 template <class R> static typename range_value<R>::type& nth_last(R& r, size_t n = 1)
 {
-	check(n > 0 && n <= boost::size(r), "nth_last called with n = " + str(n) + " for range of size " + (str(boost::size(r))));
+	check(in_range(r, n-1), "nth_last called with n = " + str(n) + " for range of size " + (str(boost::size(r))));
 	return *(boost::end(r) - n); 
 }
-template <class R> size_t last_index(R& r)
+template <class R> static size_t last_index(R& r)
 {
 	return (boost::size(r) - 1); 
 }
@@ -318,23 +393,25 @@ template <class R, class UnaryFunction> static UnaryFunction for_each(R& r, Unar
 }
 template <class R, class T> static bool in(const R& r, const T& t)
 {
-	return find(boost::begin(r), boost::end(r), t) != boost::end(r);
+	return find(r, t) != boost::end(r);
 }
 template <class R, class T> static size_t index(const R& r, const T& t)
 {
-	return distance(boost::begin(r), find(boost::begin(r), boost::end(r), t));
+	return distance(boost::begin(r), find(r, t));
 }
 template <class R> static void reverse(R& r)
 {
 	reverse(boost::begin(r), boost::end(r));
 }
-template <class R> static void sort(R& r)
+template <class R> static R& sort(R& r)
 {
 	sort(boost::begin(r), boost::end(r));
+	return r;
 }
-template <class R> static void reverse_sort(R& r)
+template <class R> static R& reverse_sort(R& r)
 {
-	sort(boost::rbegin(r), boost::rend(r));
+	reverse(sort(r));
+	return r;
 }
 template <class R> pair<typename range_value<R>::type, typename range_value<R>::type> minmax(const R& r)
 {
@@ -360,11 +437,6 @@ template <class R1, class R2> typename boost::range_value<R1>::type euclidean_sq
 	}
 	return d;
 }
-template<class R> static void range_negate
-		(R& r)
-{
-	transform(boost::begin(r), boost::end(r), boost::begin(r), negate<typename boost::range_value<R>::type>());
-}
 template<class R> static void fill (R& r, const typename boost::range_value<R>::type& v)
 {
 	fill(boost::begin(r), boost::end(r), v);
@@ -382,6 +454,22 @@ template<class R1, class R2> static void reverse_copy(const R1& source, R2& dest
 {
 	reverse_copy(boost::begin(source), boost::end(source), boost::begin(dest));
 }
+template<class R, class T> void vector_assign(const R& r, vector<T>& v)
+{
+	v.resize(boost::size(r));
+	copy(r, v);
+}
+template<class R> static void range_negate_equals(R& r)
+{
+	transform(boost::begin(r), boost::end(r), boost::begin(r), negate<typename boost::range_value<R>::type>());
+}
+template<class R> static vector<typename boost::range_value<R>::type>& range_negate(const R& r)
+{
+	static vector<typename boost::range_value<R>::type> v;
+	vector_assign(r, v);
+	range_negate_equals(v);
+	return v;
+}
 template <class R> static vector<typename boost::range_value<R>::type>& flip(const R& r)
 {
 	static vector<typename boost::range_value<R>::type> v;
@@ -393,9 +481,10 @@ template<class R1, class R2> static bool equal(const R1& source, R2& dest)
 {
 	return ((boost::size(source) == boost::size(dest)) && equal(boost::begin(source), boost::end(source), boost::begin(dest)));
 }
-template<class R> static void shuffle (R& r)
+template<class R> static R& shuffle (R& r)
 {
 	random_shuffle(boost::begin(r), boost::end(r));
+	return r;
 }
 template <class R> static typename range_value<R>::type max(const R& r)
 {
@@ -413,6 +502,10 @@ template <class C, class Tr, class R> static void print_range(basic_ostream<C, T
 			out << delim << *b; 
 		}
 	}
+}
+template <class C, class Tr, class R> static void print_range(basic_ostream<C, Tr>& out, const R& r, const char delim)
+{
+	print_range(out, r, str(delim));
 }
 template <class C, class Tr, class R> static basic_ostream<C, Tr>& operator <<(basic_ostream<C, Tr>& out, const R& r)
 {
@@ -452,18 +545,38 @@ template<class R1, class R2, class R3, class R4, class R5> static size_t range_m
 {
 	return min(min(min(min(boost::size(a), boost::size(b)), boost::size(c)), boost::size(d)), boost::size(e));
 }
-template <class R> static int max_index(const R& r)
+template <class R> static int arg_max(const R& r)
 {
 	return distance(boost::begin(r), max_element(boost::begin(r), boost::end(r)));
 }
 //ARITHMETIC RANGE OPERATIONS
+template<class T1, class T2, class T3, class T4> static T1 gauss_pdf(const T2& x, const T3& mean, const T4& stdDev)
+{
+	math::normal_distribution<T3> d(mean, stdDev);
+	return T1(math::pdf(d, x));
+}
+template<class T, class R1, class R2, class R3> static T range_indep_gauss_pdf(const R1& variables, const R2& means, const R3& stdDevs)
+{
+	assert(boost::size(variables) == boost::size(means));
+	assert(boost::size(means) == boost::size(stdDevs));
+	T prob(1);
+	typename range_iterator<R1>::type v = boost::begin(variables); 
+	typename range_iterator<R1>::type end = boost::end(variables);
+	typename range_iterator<R2>::type mean = boost::begin(means); 
+	typename range_iterator<R3>::type sd = boost::begin(stdDevs);
+	for (; v != end; ++v, ++mean, ++sd)
+	{
+		prob *= gauss_pdf(*v, *mean, *sd);
+	}
+	return prob;
+}
 template<class R1, class R2> static typename range_value<R1>::type inner_product(const R1& a, const R2& b, typename range_value<R1>::type c = 0)
 {
 	return inner_product(boost::begin(a), boost::end(a), boost::begin(b), c);
 }
-template <class R> static typename range_value<R>::type magnitude(const R& r)
+template <class R> static typename range_value<R>::type norm(const R& r)
 {
-	return 0.5 * inner_product(r, r);
+	return sqrt(inner_product(r, r));
 }
 template <class R1, class R2> static typename range_value<R1>::type sum_of_squares(const R1& r1, const R2& r2)
 {
@@ -486,11 +599,54 @@ template <class R> static typename range_value<R>::type sum(const R& r)
 {
 	return accumulate(boost::begin(r), boost::end(r), (typename range_value<R>::type)0);
 }
+template <class R> static typename range_value<R>::type abs_sum(const R& r)
+{
+	typename range_const_iterator<R>::type e = boost::end(r);
+	typename range_value<R>::type v = 0;
+	for (typename range_const_iterator<R>::type it = boost::begin(r); it != e; ++it)
+	{
+		v += abs(*it);
+	}
+	return v;
+}
+template <class R> static typename range_value<R>::type log_sum(const R& r)
+{
+	typename range_const_iterator<R>::type e = boost::end(r);
+	typename range_value<R>::type v = 0;
+	for (typename range_const_iterator<R>::type it = boost::begin(r); it != e; ++it)
+	{
+		v += Log<typename range_value<R>::type>::safe_log(*it);
+	}
+	return v;
+}
 template <class R> static typename range_value<R>::type mean(const R& r)
 {
 	return sum(r) / (typename range_value<R>::type)boost::size(r);
 }
+template <class R> static typename range_value<R>::type variance(const R& r)
+{
+	typename range_value<R>::type M = mean(r);
+	typename range_value<R>::type v = 0;
+	typename range_const_iterator<R>::type e = boost::end(r);
+	for (typename range_const_iterator<R>::type it = boost::begin(r); it != e; ++it)
+	{
+		v += squared(*it - M);
+	}
+	return v / boost::size(r);
+}
+template <class R> static typename range_value<R>::type std_dev(const R& r)
+{
+	return sqrt(variance(r));
+}
 //plus
+template<class R1, class R2> static void range_plus_val(R1& a, const R2& b, const typename boost::range_value<R2>::type& c)
+{
+	transform(boost::begin(b), boost::end(b), boost::begin(a), bind2nd(plus<typename boost::range_value<R2>::type>(), c));
+}
+template<class R> static void range_plus_val(R& a, const typename boost::range_value<R>::type& b)
+{
+	range_plus_val(a, a, b);
+}
 template<class R1, class R2, class R3> static R1& range_plus(R1& a, const R2& b, const R3& c)
 {
 	transform(boost::begin(b), boost::end(b), boost::begin(c), boost::begin(a), plus<typename boost::range_value<R1>::type>());
@@ -501,6 +657,14 @@ template<class R1, class R2> static void range_plus_equals(R1& a, const R2& b)
 	range_plus(a, a, b);
 }
 //minus
+template<class R1, class R2> static void range_minus_val(R1& a, const R2& b, const typename boost::range_value<R2>::type& c)
+{
+	transform(boost::begin(b), boost::end(b), boost::begin(a), bind2nd(minus<typename boost::range_value<R2>::type>(), c));
+}
+template<class R> static void range_minus_val(R& a, const typename boost::range_value<R>::type& b)
+{
+	range_minus_val(a, a, b);
+}
 template<class R1, class R2, class R3> static void range_minus(R1& a, const R2& b, const R3& c)
 {
 	transform(boost::begin(b), boost::end(b), boost::begin(c), boost::begin(a), minus<typename boost::range_value<R1>::type>());
@@ -526,6 +690,17 @@ template<class R1, class R2> static void range_multiply_equals(R1& a, const R2& 
 {
 	range_multiply(a, a, b);
 }
+template<class R1, class R2, class R3> static void range_multiply_add(R1& a, const R2& b, const R3& c)
+{
+	typename range_iterator<R1>::type ab = boost::begin(a); 
+	typename range_iterator<R1>::type ae = boost::end(a);
+	typename range_const_iterator<R2>::type bb = boost::begin(b); 
+	typename range_const_iterator<R3>::type cb = boost::begin(c); 
+	for(;ab != ae; ++ab,++bb,++cb)
+	{
+		*ab += *bb * *cb;
+	}
+}
 //divide
 template<class R1, class R2> static void range_divide_val(R1& a, const R2& b, const typename boost::range_value<R1>::type& c)
 {
@@ -542,17 +717,6 @@ template<class R1, class R2, class R3> static void range_divide(R1& a, const R2&
 template<class R1, class R2> static void range_divide_equals(R1& a, const R2& b)
 {
 	range_divide(a, a, b);
-}
-//SET OPERATIONS
-template<class R, class T> void operator +=(set<T>& s, const R& r)
-{
-	s.insert(boost::begin(r), boost::end(r));
-}
-//VECTOR OPERATIONS
-template<class R, class T> void vector_assign(const R& r, vector<T>& v)
-{
-	v.resize(boost::size(r));
-	copy(r, v);
 }
 //TUPLE OPERATIONS
 template<class T1, class T2> static ostream& operator << (ostream& out, const tuple<T1, T2>& t)
@@ -576,6 +740,14 @@ template<class T1, class T2, class T3, class T4, class T5> static ostream& opera
 	return out;
 }
 //PAIR OPERATIONS
+template<class T> static bool in_open_interval(pair<T,T> interval, T val)
+{
+	return ((val > interval.first) && (val < interval.second));
+}
+template<class T> static bool in_closed_interval(pair<T,T> interval, T val)
+{
+	return ((val >= interval.first) && (val <= interval.second));
+}
 template<class T1, class T2> static void operator+= (pair<T1, T2>& a, const pair<T1, T2>& b)
 {
 	a.first += b.first;
@@ -590,15 +762,15 @@ template<class T1, class T2> static ostream& operator << (ostream& out, const pa
 	out << p.first << " " << p.second;
 	return out;
 }
-template<class T1, class T2> static double pair_product(const pair<T1, T2>& p)
+template<class T1, class T2> static real_t pair_product(const pair<T1, T2>& p)
 {
-	return (double)(p.first * p.second);
+	return (real_t)(p.first * p.second);
 }
-template<class T1, class T2> static double pair_sum(const pair<T1, T2>& p)
+template<class T1, class T2> static real_t pair_sum(const pair<T1, T2>& p)
 {
-	return (double)(p.first + p.second);
+	return (real_t)(p.first + p.second);
 }
-template<class T1, class T2> static double pair_mean(const pair<T1, T2>& p)
+template<class T1, class T2> static real_t pair_mean(const pair<T1, T2>& p)
 {
 	return pair_sum(p)/2.0;
 }
@@ -607,17 +779,31 @@ template <class T1, class T2> static size_t difference(const pair<T1,T2>& p)
 	return p.second - p.first;
 }
 //MAP OPERATIONS
-template<class T1, class T2> static bool in (const map<T1, T2>& a, const T1& b)
+template<class T1, class T2> static bool in(const map<T1, T2>& a, const T1& b)
 {
 	return (a.find(b) != a.end());
 }
-template<class T1, class T2> static const T2& at (const map<T1, T2>& a, const T1& b)
+template<class T1, class T2> static const T2& at(const map<T1, T2>& a, const T1& b)
 {
 	typename map<T1, T2>::const_iterator it = a.find(b);
 	check(it != a.end(), str(b) + " not found in map:\n" + str(a));
 	return it->second;
 }
-template<class T1, class T2> static ostream& operator << (ostream& out, const map<T1, T2>& m)
+template<class T1, class T2> static void print_left(const map<T1, T2>& m, ostream& out = cout, const char delim = ' ')
+{
+	for (typename map<T1, T2>::const_iterator it = m.begin(); it != m.end(); ++it)
+	{
+		out << it->first << delim; 
+	}
+}
+template<class T1, class T2> static void print_right(const map<T1, T2>& m, ostream& out = cout, const char delim = ' ')
+{
+	for (typename map<T1, T2>::const_iterator it = m.begin(); it != m.end(); ++it)
+	{
+		out << it->second << delim; 
+	}
+}
+template<class T1, class T2> static ostream& operator <<(ostream& out, const map<T1, T2>& m)
 {
 	for (typename map<T1, T2>::const_iterator it = m.begin(); it != m.end(); ++it)
 	{
@@ -625,7 +811,7 @@ template<class T1, class T2> static ostream& operator << (ostream& out, const ma
 	}
 	return out;
 }
-template<class T1, class T2> static ostream& operator << (ostream& out, const map<T1, T2*>& m)
+template<class T1, class T2> static ostream& operator <<(ostream& out, const map<T1, T2*>& m)
 {
 	for (typename map<T1, T2*>::const_iterator it = m.begin(); it != m.end(); ++it)
 	{
@@ -633,7 +819,7 @@ template<class T1, class T2> static ostream& operator << (ostream& out, const ma
 	}
 	return out;
 }
-template<class T1, class T2> static T2 sum_right (const map<T1, T2>& m)
+template<class T1, class T2> static T2 sum_right(const map<T1, T2>& m)
 {
 	T2 ret = 0;
 	for (typename map<T1, T2>::const_iterator it = m.begin(); it != m.end(); ++it)
@@ -642,42 +828,42 @@ template<class T1, class T2> static T2 sum_right (const map<T1, T2>& m)
 	}
 	return ret;
 }
-template<class T1, class T2, class T3, class T4> static void operator += (map<T1, T2>& a, const map<T3, T4>& b)
+template<class T1, class T2, class T3, class T4> static void operator +=(map<T1, T2>& a, const map<T3, T4>& b)
 {
 	for (typename map<T3, T4>::const_iterator it = b.begin(); it != b.end(); ++it)
 	{
 		a[it->first] += it->second;
 	}
 }
-template<class T1, class T2, class T3, class T4> static void operator-= (map<T1, T2>& a, const map<T3, T4>& b)
+template<class T1, class T2, class T3, class T4> static void operator -=(map<T1, T2>& a, const map<T3, T4>& b)
 {
 	for (typename map<T3, T4>::const_iterator it = b.begin(); it != b.end(); ++it)
 	{
 		a[it->first] -= it->second;
 	}
 }
-template<class T1, class T2, class T3, class T4> static void operator/= (map<T1, T2>& a, const map<T3, T4>& b)
+template<class T1, class T2, class T3, class T4> static void operator /=(map<T1, T2>& a, const map<T3, T4>& b)
 {
 	for (typename map<T3, T4>::const_iterator it = b.begin(); it != b.end(); ++it)
 	{
 		a[it->first] /= it->second;
 	}
 }
-template<class T1, class T2, class T3, class T4> static void operator*= (map<T1, T2>& a, const map<T3, T4>& b)
+template<class T1, class T2, class T3, class T4> static void operator *=(map<T1, T2>& a, const map<T3, T4>& b)
 {
 	for (typename map<T3, T4>::const_iterator it = b.begin(); it != b.end(); ++it)
 	{
 		a[it->first] *= it->second;
 	}
 }
-template<class T1, class T2, class T3> static void operator*= (map<T1, T2>& a, const T3& b)
+template<class T1, class T2, class T3> static void operator *=(map<T1, T2>& a, const T3& b)
 {
 	for (typename map<T1, T2>::iterator it = a.begin(); it != a.end(); ++it)
 	{
 		it->second *= b;
 	}
 }
-template<class T1, class T2, class T3> static void operator/= (map<T1, T2>& a, const T3& b)
+template<class T1, class T2, class T3> static void operator /=(map<T1, T2>& a, const T3& b)
 {
 	for (typename map<T1, T2>::iterator it = a.begin(); it != a.end(); ++it)
 	{
@@ -692,12 +878,12 @@ template<class R> void delete_map(R& r)
 	}
 }
 //MULTIMAP OPERATIONS
-template<class T1, class T2> static bool in (const multimap<T1, T2>& a, const T1& b)
+template<class T1, class T2> static bool in(const multimap<T1, T2>& a, const T1& b)
 {
 	return (a.find(b) != a.end());
 }
 //BIMAP OPERATIONS
-template<class T1, class T2, class T3, class T4> static ostream& operator << (ostream& out, const boost::bimaps::relation::structured_pair<T1, T2, T3, T4>& p)
+template<class T1, class T2, class T3, class T4> static ostream& operator <<(ostream& out, const boost::bimaps::relation::structured_pair<T1, T2, T3, T4>& p)
 {
 	out << p.first << " " << p.second;
 	return out;
@@ -747,7 +933,7 @@ static void prt_line(ostream& out = cout)
 {
 	out << "------------------------------" << endl;
 }
-template<class T> T read(const string& data)
+template<class T> static T read(const string& data)
 {
 	T val;
 	stringstream ss;
@@ -755,96 +941,36 @@ template<class T> T read(const string& data)
 	check(ss >> val, "cannot read string '" + data + "' into variable with type '" + typeid(T).name() + "'");
 	return val;
 }
-//STRING OPERATIONS
-static string ordinal(size_t n)
+//SET OPERATIONS
+template<class T> static bool disjoint(const set<T>& s1, const set<T>& s2)
 {
-	string s = str(n);
-	if (n < 100)
-	{
-		char c = nth_last(s);
-		if(c == '1')
-		{
-			return s + "st";
-		}
-		else if(c == '2')
-		{
-			return s + "nd";
-		}
-		else if(c == '3')
-		{
-			return s + "rd";
-		}
-	}
-	return s + "th";
+	static set<T> result;
+	result.clear();
+	set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(), insert_iterator<set<T> >(result, result.begin()));
+	return result.empty();
 }
-static void trim(string& str)
+template<class T> static bool intersecting(const set<T>& s1, const set<T>& s2)
 {
-    size_t startpos = str.find_first_not_of(" \t\n");
-    size_t endpos = str.find_last_not_of(" \t\n");
-	if(string::npos == startpos || string::npos == endpos)  
-    {  
-        str = "";  
-    }  
-    else 
-	{
-        str = str.substr(startpos, endpos-startpos + 1);
-	}
+	return !disjoint(s1, s2);
 }
-static bool in(const string& str, const string& search)
+template<class T> static assign_detail::generic_list<T> empty_list_of()
 {
-	return (str.find(search) != string::npos);
+	return assign_detail::generic_list<T>();
 }
-static bool in(const string& str, const char* search)
+//PROBABILITY FUNCTIONS
+static real_t KL_normal(real_t pMean, real_t pVar, real_t qMean, real_t qVar)
 {
-	return in(str, string(search));
+	return 0.5 * (log(qVar/pVar) - 1 + ((squared(pMean - qMean) + pVar) / qVar));
 }
-template<class T> vector<T>& split(const string& original, const char delim = ' ')
+static real_t nats_to_bits(real_t nats)
 {
-	static vector<T> vect;
-	vect.clear();
-	stringstream ss;
-	ss << original;
-	string s;
-	while (getline(ss, s, delim))
-	{
-		vect += read<T>(s);
-	}
-	return vect;
+	static real_t F = 1.0 / Log<real_t>::safe_log(2);
+	return F * nats;
 }
-template<class T, class R >string join(const R& r, const string joinStr = "")
+static real_t bits_to_nats(real_t bits)
 {
-	typename range_iterator<R>::type b = boost::begin(r);
-	string s = str(*b);
-	++b;
-	for (; b != end(r); ++b)
-	{
-		s += joinStr + str(*b);
-	}
-	return s;
+	static real_t F = Log<real_t>::safe_log(2);
+	return F * bits;
 }
-
-//HELPER STRUCTS
-template<class T> struct View: public sub_range<pair <T*, T*> >
-{	
-	View(pair<T*, T*>& p):
-		sub_range<pair <T*, T*> >(p)
-	{}
-	View(T* first = 0, T* second = 0):
-		sub_range<pair <T*, T*> >(make_pair(first, second))
-	{}
-	T& at(size_t i)
-	{
-		check(i < this->size(), "at(" + str(i) + ") called for view of size " + str(this->size()));
-		return (*this)[i];
-	}
-	const T& at(size_t i) const
-	{
-		check(i < this->size(), "at(" + str(i) + ") called for view of size " + str(this->size()));
-		return (*this)[i];	
-	}
-};
-
-typedef const tuple<View<double>&, vector<double>&>& TVWDVD;
-typedef const tuple<View<double>&, View<double>&>& TVWDVWD;
 
 #endif

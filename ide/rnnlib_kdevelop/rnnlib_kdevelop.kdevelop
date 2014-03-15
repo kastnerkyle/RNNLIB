@@ -16,6 +16,7 @@
     <absoluteprojectpath>false</absoluteprojectpath>
     <description/>
     <defaultencoding/>
+    <versioncontrol/>
   </general>
   <kdevautoproject>
     <general/>
@@ -85,6 +86,7 @@
     </ignoredoxygen>
   </kdevdoctreeview>
   <kdevfilecreate>
+    <filetypes/>
     <useglobaltypes>
       <type ext="cpp" />
       <type ext="h" />
@@ -99,13 +101,14 @@
     </groups>
     <tree>
       <hidepatterns>*.cpp;*.hpp</hidepatterns>
-      <hidenonprojectfiles>false</hidenonprojectfiles>
+      <hidenonprojectfiles>true</hidenonprojectfiles>
     </tree>
   </kdevfileview>
   <kdevdocumentation>
     <projectdoc>
       <docsystem>Doxygen Documentation Collection</docsystem>
       <docurl>rnnlib_kdevelop.tag</docurl>
+      <usermanualurl/>
     </projectdoc>
   </kdevdocumentation>
   <substmap>
@@ -173,10 +176,10 @@
   <kdevcustomproject>
     <run>
       <directoryradio>executable</directoryradio>
-      <mainprogram>/home/alex/usr/src/rnnlib/src/rnnlib</mainprogram>
-      <programargs>arabic_offline_demo.config</programargs>
-      <globaldebugarguments>arabic_offline_demo.config</globaldebugarguments>
-      <globalcwd>/home/alex/usr/src/rnnlib/samples/</globalcwd>
+      <mainprogram>/home/alex/usr/src/rnnlib/bin/rnnlib</mainprogram>
+      <programargs>ifn_enit_filenames.list TMP</programargs>
+      <globaldebugarguments>--mixtureTypes=discrete_0_1,scaled-beta_a=0_b=1.6 gauss.config</globaldebugarguments>
+      <globalcwd>/home/alex/usr/src/rnnlib/examples/wind</globalcwd>
       <useglobalprogram>false</useglobalprogram>
       <terminal>false</terminal>
       <autocompile>false</autocompile>
@@ -204,11 +207,17 @@
     </filetypes>
     <blacklist>
       <path>config.h</path>
-      <path>ide</path>
-      <path>ide/rnnlib_kdevelop</path>
-      <path>ide/rnnlib_kdevelop/Makefile</path>
+      <path>include.hpp</path>
       <path>Makefile</path>
+      <path>rnnlib</path>
+      <path>rnnlib/Makefile</path>
+      <path>src/CodeNet.hpp</path>
+      <path>src/DecodingLayer.hpp</path>
       <path>src/Makefile</path>
+      <path>src/MemoryNet.hpp</path>
+      <path>src/ObjectStore.hpp</path>
+      <path>src/PmNet.hpp</path>
+      <path>src/Word.hpp</path>
     </blacklist>
     <build>
       <buildtool>make</buildtool>

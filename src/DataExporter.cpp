@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -19,14 +19,14 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 
 void DataExportHandler::save(ostream& out) const
 {
-	loop(const PSPDE& exp, dataExporters)
+	LOOP(const PSPDE& exp, dataExporters)
 	{
 		out << *(exp.second);
 	}
 }
 void DataExportHandler::load(ConfigFile& conf, ostream& out)
 {
-	loop(PSPDE& exp, dataExporters)
+	LOOP(PSPDE& exp, dataExporters)
 	{
 		if(!exp.second->load(conf, out))
 		{
@@ -37,9 +37,9 @@ void DataExportHandler::load(ConfigFile& conf, ostream& out)
 }
 void DataExportHandler::display(const string& path) const
 {
-	loop(const PSPDE& exp, dataExporters)
+	LOOP(const PSPDE& exp, dataExporters)
 	{
-		loop(const PSPV& val, exp.second->displayVals)
+		LOOP(const PSPV& val, exp.second->displayVals)
 		{			
 			string filename = path + exp.first + "_" + val.first;
 			ofstream out (filename.c_str());

@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -26,8 +26,9 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include <boost/assign/std/vector.hpp>
 #include <boost/optional.hpp>
 #include <boost/range.hpp>
-#include "list_of.hpp"
+#include <boost/assign/list_of.hpp>
 #include "Helpers.hpp"
+#include "Container.hpp"
 
 using namespace std;
 using namespace boost;
@@ -36,8 +37,8 @@ using namespace boost::assign;
 template <class T> struct MultiArray
 {
 	//data
-	vector<T> data;
-	vector<size_t> shape;
+	Vector<T> data;
+	Vector<size_t> shape;
 	vector<size_t> strides;
 	
 	//functions
@@ -80,13 +81,17 @@ template <class T> struct MultiArray
 	template<class R> void reshape(const R& newShape)
 	{
 		assert(newShape.size());
-		vector_assign(newShape, shape);
+		shape = newShape;
 		resize_data();
 	}
-	template<class R> void reshape(const R& dims, const T& fillval)
+	void fill_data(const T& fillVal)
+	{
+		fill(data, fillVal);
+	}
+	template<class R> void reshape(const R& dims, const T& fillVal)
 	{
 		reshape(dims);
-		fill(data, fillval);
+		fill_data(fillVal);
 	}
 	bool in_range(const vector<int>& coords) const
 	{
@@ -115,20 +120,19 @@ template <class T> struct MultiArray
 		check(boost::size(coords) == shape.size(), "get(" + str(coords) + ") called with shape " + str(shape));
 		return (*this)[coords].front();
 	}
+	size_t offset(const vector<int>& coords) const
+	{
+		return inner_product(coords, strides);
+	}
 	const View<T> operator[](const vector<int>& coords)
 	{
 		check(coords.size() <= shape.size(), "operator [" + str(coords) + "] called with shape " + str(shape));
 		if (coords.empty())
 		{
-			return View<T>(&data.front(), &*data.end());
+			return View<T>(&data.front(), &data.front() + data.size());
 		}
-		T* start = &data.front(); 
-		VSTCI strideIt = strides.begin();
-		for (VICI coordIt = coords.begin(); coordIt != coords.end(); ++coordIt, ++strideIt)
-		{
-			start += (*coordIt * *strideIt);
-		}
-		T* end = start + *(--strideIt);
+		T* start = &data.front() + offset(coords); 
+		T* end = start + strides[coords.size() - 1];
 		return View<T>(start, end);
 	}
 	const View<const T> operator[](const vector<int>& coords) const
@@ -136,15 +140,11 @@ template <class T> struct MultiArray
 		check(coords.size() <= shape.size(), "operator [" + str(coords) + "] called with shape " + str(shape));
 		if (coords.empty())
 		{
-			return View<const T>(&data.front(), &*data.end());
+			return View<const T>(&data.front(), &data.front() + data.size());
 		}
 		const T* start = &data.front(); 
-		VSTCI strideIt = strides.begin();
-		for (VICI coordIt = coords.begin(); coordIt != coords.end(); ++coordIt, ++strideIt)
-		{
-			start += (*coordIt * *strideIt);
-		}
-		const T* end = start + *(--strideIt);
+		VSTCI strideIt = strides.begin() + offset(coords);
+		const T* end = start + strides[coords.size() - 1];
 		return View<const T>(start, end);
 	}
 	const View<T> at(const vector<int>& coords)
@@ -166,7 +166,7 @@ template <class T> struct MultiArray
 	template<class T2> void assign(const MultiArray<T2>& a)
 	{
 		reshape(a.shape);
-		copy(a.data.begin(), a.data.end(), data.begin());
+		copy(a.data, data);
 	}
 	template<class T2> MultiArray<T>& operator=(const MultiArray<T2>& a)
 	{
@@ -175,7 +175,7 @@ template <class T> struct MultiArray
 	}
 };
 
-template <class T> static bool operator == (const MultiArray<T>& a, const MultiArray<T>& b)
+template <class T> static bool operator ==(const MultiArray<T>& a, const MultiArray<T>& b)
 {
 	return (a.data == b.data && a.shape == b.shape);
 }

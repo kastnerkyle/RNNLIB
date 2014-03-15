@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -21,89 +21,79 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include <numeric>
 #include <limits>
 #include <boost/array.hpp>
-#include "LogDouble.hpp"
+#include "Log.hpp"
 
 using namespace std;
 using namespace boost;
 
-//#define FAST_LOGISTIC
-
-#ifdef FAST_LOGISTIC
-static const unsigned int entries = 1 << 16;
-static array<double, entries> lookup;
-#endif
-
 struct Logistic
 {
-#ifdef FAST_LOGISTIC
-	static const int maximum = 16;
-	static const int minimum = -maximum;
-	static const int range = maximum - minimum;
-	static const int entriesDivRange = entries / range;
-	static void fill_lookup()
+	static real_t fn(real_t x)
 	{
-		for (int i = 0; i < entries; ++i)
+		if (x < Log<real_t>::expLimit)
 		{
-			double x = (double)minimum + ((double)((i + 0.5) * range) / (double) entries);
-			lookup[i] = (1.0 / (1.0 + exp(-x)));
+			if(x > -Log<real_t>::expLimit)
+			{
+				return 1.0 / (1.0 + exp(-x));
+			}
+			return 0;
 		}
+		return 1;
 	}
-#endif
-	static double fn(double x)
-	{
-#ifdef FAST_LOGISTIC
-		if (runningGradTest)
-		{
-#endif
-			if (x < -expLimit)
-			{
-				return 1;
-			}
-			else if (x > expLimit)
-			{
-				return 0;
-			}
-			return 1.0 / (1.0 + exp(-x));
-#ifdef FAST_LOGISTIC
-		}
-		else
-		{
-			if (x <= minimum)
-			{
-				return 0;
-			}
-			else if (x >= maximum)
-			{
-				return 1;
-			}
-			int box = (x + maximum) * entriesDivRange;
-			return lookup[box];
-		}
-#endif
-	}
-	static double deriv(double y)
+	static real_t deriv(real_t y)
 	{
 		return y*(1.0-y); 
+	}
+	static real_t second_deriv(real_t y)
+	{
+		return deriv(y) * (1 - (2 * y));
+	}
+};
+struct Softsign
+{
+	static real_t fn(real_t x)
+	{
+		if (x < realMax)
+		{
+			if (x > -realMax)
+			{
+				return (x/(1 + fabs(x)));
+			}
+			return -1;
+		}
+		return 1;
+	}
+	static real_t deriv(real_t y)
+	{
+		return squared(1 - fabs(y));
+	}
+	static real_t second_deriv(real_t y)
+	{
+		return -2 * sign(y) * pow((1 - fabs(y)), 3);
 	}
 };
 struct Identity
 {
-	static double fn(double x)
+	static real_t fn(real_t x)
 	{
 		return x;
 	}
-	static double deriv(double y)
+	static real_t deriv(real_t y)
 	{
 		return 1;
+	}
+	static real_t second_deriv(real_t y)
+	{
+		return 0;
 	}
 };
 struct Maxmin2
 {
-	static double fn(double x)
+	static real_t fn(real_t x)
 	{
 		return (4 * Logistic::fn(x)) - 2;
 	}
-	static double deriv(double y)
+	static real_t deriv(real_t y)
 	{
 		if (y==-2 || y==2)
 		{
@@ -111,14 +101,18 @@ struct Maxmin2
 		}
 		return (4 - (y * y)) / 4.0;
 	}
+	static real_t second_deriv(real_t y)
+	{
+		return -deriv(y) * 0.5 * y;
+	}
 };
 struct Maxmin1
 {
-	static double fn(double x)
+	static real_t fn(real_t x)
 	{
 		return (2 * Logistic::fn(x)) - 1;
 	}
-	static double deriv(double y)
+	static real_t deriv(real_t y)
 	{
 		if (y==-1 || y==1)
 		{
@@ -126,22 +120,18 @@ struct Maxmin1
 		}
 		return (1.0 - (y * y)) / 2.0;
 	}
+	static real_t second_deriv(real_t y)
+	{
+		return -deriv(y) * y;
+	}
 };
 struct Max2min0
 {
-	static double fn(double x)
+	static real_t fn(real_t x)
 	{
-		if (x < -expLimit)
-		{
-			x = -expLimit;
-		}
-		else if (x > expLimit)
-		{ 
-			x = expLimit;
-		}
 		return (2 * Logistic::fn(x));
 	}
-	static double deriv(double y)
+	static real_t deriv(real_t y)
 	{
 		if (y==-1 || y==1)
 		{
@@ -149,16 +139,24 @@ struct Max2min0
 		}
 		return y * (1 - (y / 2.0));
 	}
+	static real_t second_deriv(real_t y)
+	{
+		return deriv(y) * (1 - y);
+	}
 };
 struct Tanh
 {
-	static double fn(double x)
+	static real_t fn(real_t x)
 	{
 		return Maxmin1::fn(2*x);
 	}
-	static double deriv(double y)
+	static real_t deriv(real_t y)
 	{
 		return 1.0 - (y *  y); 
+	}
+	static real_t second_deriv(real_t y)
+	{
+		return -2 * deriv(y) * y;
 	}
 };
 

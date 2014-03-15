@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -23,18 +23,18 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 template <class R> struct CoordIterator
 {
 	//data
-	vector<size_t> shape;
+	Vector<size_t> shape;
 	vector<int> directions;
 	vector<int> pt;
 	bool end;
 		
 	//functions
-	CoordIterator (const R& shap, const vector<int>& dirs = list_of<int>(), bool reverse = false):
+	CoordIterator (const R& sh, const vector<int>& dirs = empty_list_of<int>(), bool reverse = false):
+		shape(sh),
 		directions(dirs),
-		pt(boost::size(shap)),
+		pt(boost::size(shape)),
 		end(false)
 	{
-		vector_assign(shap, shape);
 		directions.resize(shape.size(), 1);
 		if (reverse)
 		{
@@ -101,7 +101,7 @@ template <class R> struct CoordIterator
 	}
 	void begin()
 	{
-		for (int i = 0; i < shape.size(); ++i)
+		LOOP (int i, indices(shape))
 		{
 			pt[i] = ((directions[i] > 0) ? 0 : shape[i] - 1);
 		}
@@ -120,7 +120,12 @@ template <class T> struct SeqBuffer: public MultiArray<T>
 	SeqBuffer(size_t dep = 0):
 		depth(dep)
 	{
-		reshape(list_of<size_t>());
+		reshape(empty_list_of<size_t>());
+	}
+	SeqBuffer(const vector<size_t>& shape, size_t dep):
+		depth(dep)
+	{
+		reshape(shape);
 	}
 	SeqBuffer(const SeqBuffer& sb)
 	{
@@ -129,23 +134,29 @@ template <class T> struct SeqBuffer: public MultiArray<T>
 	virtual ~SeqBuffer()
 	{
 	}
-	using MultiArray<T>::operator[];
-	const View<T> operator[](int coord)
-	{
-		check(this->shape.size(), " operator [" + str(coord) + "] called for empty SeqBuffer");
-		T* start = &this->data[coord * depth];
-		return View<T>(start, start + depth);
-	}
 	const View<const T> operator[](int coord) const
 	{
-		check(this->shape.size(), " operator [" + str(coord) + "] called for empty SeqBuffer");
-		const T* start = &this->data[coord * depth];
-		return View<const T>(start, start + depth);
+		check(this->shape.size(), "operator [" + str(coord) + "] called for empty array");
+		const T* start = &this->data.front() + (coord * this->shape.back());
+		const T* end = start  + this->shape.back();
+		return View<const T>(start, end);
 	}
+	int seq_offset(const vector<int>& coords)
+	{
+		return this->offset(coords) / this->shape.back();
+	}
+	using MultiArray<T>::operator[];
 	using MultiArray<T>::at;
+	const View<T> operator[](int coord)
+	{
+		check(this->shape.size(), "operator [" + str(coord) + "] called for empty array");
+		T* start = &this->data.front() + (coord * this->shape.back());
+		T* end = start  + this->shape.back();
+		return View<T>(start, end);
+	}
 	const View<T> at(int coord)
 	{
-		if (coord >= 0 && (coord * (this->shape.back() < product(this->shape))))
+		if ((coord >= 0) && ((coord * this->shape.back()) < product(this->shape)))
 		{
 			return (*this)[coord];
 		}
@@ -153,31 +164,48 @@ template <class T> struct SeqBuffer: public MultiArray<T>
 	}
 	const View<const T> at(int coord) const
 	{
-		if (coord >= 0 && (coord * (this->shape.back() < product(this->shape))))
+		if ((coord >= 0) && ((coord * this->shape.back()) < product(this->shape)))
 		{
 			return (*this)[coord];
 		}
 		return View<const T>();
 	}
-	const View<T> front(const vector<int>& dirs = list_of<int>())
+	const View<T> front(const vector<int>& dirs = empty_list_of<int>())
 	{
 		return (*this)[*begin(dirs)];
 	}
-	const View<T> back(const vector<int>& dirs = list_of<int>())
+	const View<T> back(const vector<int>& dirs = empty_list_of<int>())
 	{
 		return (*this)[*rbegin(dirs)];
 	}	
-	SeqIterator begin(const vector<int>& dirs = list_of<int>()) const
+	SeqIterator begin(const vector<int>& dirs = empty_list_of<int>()) const
 	{
 		return SeqIterator(seq_shape(), dirs);
 	}
-	SeqIterator rbegin(const vector<int>& dirs = list_of<int>()) const
+	SeqIterator rbegin(const vector<int>& dirs = empty_list_of<int>()) const
 	{
 		return SeqIterator(seq_shape(), dirs, true);
 	}
 	const View<const size_t> seq_shape() const
 	{
+		if (this->shape.empty())
+		{
+			return View<const size_t>();
+		}
 		return View<const size_t>(&this->shape.front(), &this->shape.back());
+	}
+	vector<real_t>& seq_means() const
+	{
+		static vector<real_t> seqMean;
+		seqMean.resize(depth);
+		fill(seqMean, 0);
+		int seqSize = seq_size();
+		LOOP(int i, span(seqSize))
+		{
+			range_plus_equals(seqMean, (*this)[i]);
+		}
+		range_divide_val(seqMean, seqSize);
+		return seqMean;
 	}
 	size_t seq_size() const
 	{
@@ -195,11 +223,12 @@ template <class T> struct SeqBuffer: public MultiArray<T>
 	{
 		reshape(buff.seq_shape(), fillVal);
 	}
-	template<class R> void reshape(const R& newSeqShap)
+	template<class R> void reshape(const R& newSeqShape)
 	{
-		if (depth)
+		if(depth)
 		{
-			vector_assign(newSeqShap, this->shape);
+			//check(!in(newSeqShape, 0), "reshape called with shape " + str(newSeqShape) + ", all dimensions must be >0");
+			this->shape = newSeqShape;
 			this->shape += depth;
 			this->resize_data();
 		}
@@ -207,7 +236,7 @@ template <class T> struct SeqBuffer: public MultiArray<T>
 	template<class R> void reshape(const R& newSeqShap, const T& fillval)
 	{
 		reshape(newSeqShap);
-		fill(this->data, fillval);
+		this->fill_data(fillval);
 	}
 	template<class R> void reshape_with_depth(const R& newSeqShap, size_t dep)
 	{
@@ -217,14 +246,14 @@ template <class T> struct SeqBuffer: public MultiArray<T>
 	template<class R> void reshape_with_depth(const R& newSeqShap, size_t dep, const T& fillval)
 	{
 		reshape_with_depth(newSeqShap, dep);
-		fill(this->data, fillval);
+		this->fill_data(fillval);
 	}
 	void print(ostream& out) const
 	{
 		out << "DIMENSIONS: " << seq_shape() << endl;
-		loop(int j, range(this->shape.back()))
+		LOOP(int j, span(this->shape.back()))
 		{
-			loop(int i, range(seq_size()))
+			LOOP(int i, span(seq_size()))
 			{
 				out << (*this)[i][j] << " ";
 			}

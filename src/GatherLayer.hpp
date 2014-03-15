@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -30,10 +30,10 @@ struct GatherLayer: public Layer
 		Layer(name, srcs.front()->num_seq_dims(), 0, get_size(srcs), srcs.front()),
 		sources(srcs)
 	{
-		this->source = sources.front();
-		WeightContainer::instance().new_parameters(0, this->source->name, this->name, this->source->name + "_to_" + this->name);
-		display(this->outputActivations, "activations");
-		display(this->outputErrors, "errors");
+		source = sources.front();
+		WeightContainer::instance().new_parameters(0, source->name, name, source->name + "_to_" + name);
+		display(outputActivations, "activations");
+		display(outputErrors, "errors");
 	}
 	int get_size(vector<Layer*>& srcs)
 	{
@@ -46,20 +46,20 @@ struct GatherLayer: public Layer
 	}
 	void feed_forward(const vector<int>& outCoords)
 	{
-		double* actBegin = this->outputActivations[outCoords].begin();
-		loop(Layer* l, sources)
+		real_t* actBegin = outputActivations[outCoords].begin();
+		LOOP(Layer* l, sources)
 		{
-			View<double> inActs = l->outputActivations[outCoords];
+			View<real_t> inActs = l->outputActivations[outCoords];
 			copy(inActs.begin(), inActs.end(), actBegin);
 			actBegin += inActs.size();
 		}
 	}
 	void feed_back(const vector<int>& outCoords)
 	{
-		double* errBegin = this->outputErrors[outCoords].begin();
-		loop(Layer* l, sources)
+		real_t* errBegin = outputErrors[outCoords].begin();
+		LOOP(Layer* l, sources)
 		{
-			View<double> inErrs = l->outputErrors[outCoords];
+			View<real_t> inErrs = l->outputErrors[outCoords];
 			int dist = inErrs.size();
 			copy(errBegin, errBegin + dist, inErrs.begin());
 			errBegin += dist;

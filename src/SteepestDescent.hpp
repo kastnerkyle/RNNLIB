@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -29,22 +29,18 @@ struct SteepestDescent: public DataExporter, public Optimiser
 {
 	//data
 	ostream& out;
-	vector<double> deltas;
-	double learnRate;
-	double momentum;
-	vector<double>& wts;
-	vector<double>& derivs;
-	vector<double>& plasts;
-
+	vector<real_t> deltas;
+	real_t learnRate;
+	real_t momentum;
+	
 	//functions
-	SteepestDescent(ostream& o, double lr = 1e-4, double mom = 0.9, const string& name = "optimiser"):
+	SteepestDescent(const string& name, ostream& o, vector<real_t>& weights, vector<real_t>& derivatives, 
+			real_t lr = 1e-4, real_t mom = 0.9):
 		DataExporter(name),
+		Optimiser(weights, derivatives),
 		out(o),
 		learnRate(lr),
-		momentum(mom),
-		wts(WeightContainer::instance().weights),
-		derivs(WeightContainer::instance().derivatives),
-		plasts(WeightContainer::instance().plasticities)
+		momentum(mom)
 	{
 		build();
 	}
@@ -52,22 +48,15 @@ struct SteepestDescent: public DataExporter, public Optimiser
 	{
 		assert(wts.size() == derivs.size());
 		assert(wts.size() == deltas.size());
-		loop(TDDDD t, zip(wts, deltas, derivs, plasts))
-		{
-			double& delta = t.get<1>();
-			double newDelta = t.get<3>() * ((momentum * delta) - (learnRate * t.get<2>()));
-			delta = newDelta;
-			t.get<0>() += newDelta;
-		}
-//		for (int i = 0; i < wts.size(); ++i)
-//		{
-//			double delta = plasts[i] * ((momentum * deltas[i]) - (learnRate * derivs[i]));
-//			deltas[i] = delta;
-//			wts[i] += delta;
-//		}
+        LOOP (int i, indices(wts))
+        {
+            real_t delta = (momentum * deltas[i]) - (learnRate * derivs[i]);
+            deltas[i] = delta;
+            wts[i] += delta;
+        }
 		if (verbose)
 		{
-			out << "weight updates:" << endl;
+			out << this->name << " weight updates:" << endl;
 			PRINT(minmax(wts), out);
 			PRINT(minmax(derivs), out);
 			PRINT(minmax(deltas), out);
@@ -80,7 +69,7 @@ struct SteepestDescent: public DataExporter, public Optimiser
 		{		
 			deltas.resize(wts.size());
 			fill(deltas, 0);
-			WeightContainer::instance().save_by_conns(deltas, "deltas");
+			WeightContainer::instance().save_by_conns(deltas, name + "_deltas");
 		}
 	}
 	void print(ostream& out = cout) const

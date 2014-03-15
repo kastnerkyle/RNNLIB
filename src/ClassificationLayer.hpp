@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -18,123 +18,153 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #ifndef _INCLUDED_ClassificationLayer_h  
 #define _INCLUDED_ClassificationLayer_h  
 
-#include <boost/bimap.hpp>
 #include "SoftmaxLayer.hpp"
 
-struct ClassificationLayer: public SoftmaxLayer
+struct ClassificationLayer: public NetworkOutput
 {
 	//data
 	ostream& out;
-	const bimap<int, string>& labels;
+	Vector<string> labels;
 	SeqBuffer<int> targets;
 	vector<vector<int> > confusionMatrix;
-	vector<int> classErrors;
-	vector<int> classTargets;
-	vector<pair<double, int> >labelProbs;
+	vector<int> numErrorsByClass;
+	vector<int> numTargetsByClass;
+	vector<int> outputs;
 	
 	//functions
-	ClassificationLayer(ostream& o, const string& name, size_t numSeqDims, const bimap<int, string>& lab):
-		SoftmaxLayer(name, numSeqDims, lab.size()),
+	ClassificationLayer(ostream& o, const vector<string>& labs):
 		out(o),
-		labels(lab),
-		targets(this->output_size()),	
-		confusionMatrix(this->output_size()),
-		classErrors(this->output_size()),
-		classTargets(this->output_size()),
-		labelProbs(this->output_size())
+		labels(labs),
+		targets(labels.size()),	
+		confusionMatrix(labels.size()),
+		numErrorsByClass(labels.size()),
+		numTargetsByClass(labels.size())
 	{
-		loop(vector<int>& v, confusionMatrix)
+		LOOP(vector<int>& v, confusionMatrix)
 		{
-			v.resize(this->output_size());
+			v.resize(labels.size());
 		}
-		this->criteria = list_of("crossEntropyError")("classificationError");
-		display(targets, "targets", &labels);
-		display(this->inputErrors, "inputErrors", &labels);
-		display(this->inputErrors, "outputErrors", &labels);
-		display(this->inputActivations, "inputActivations", &labels);
-		display(this->outputActivations, "outputActivations", &labels);
+		criteria = list_of("crossEntropyError")("classificationError");
 	}
-	double calculate_errors(const DataSequence& seq)
+	virtual int output_class(int pt) const = 0;
+	virtual real_t class_prob(int pt, int index) const = 0;
+	virtual real_t set_error(int pt, int targetClass) = 0;
+	real_t calculate_errors(const DataSequence& seq)
 	{
-		assert(equal(seq.targetClasses.seq_shape(), this->outputActivations.seq_shape()));
-		loop(vector<int>& v, confusionMatrix)
+		LOOP(vector<int>& v, confusionMatrix)
 		{
 			fill(v, 0);
 		}
-		targets.reshape(this->outputActivations, 0);
-		double crossEntropyError = 0;
-		loop(int i, range(this->outputActivations.seq_size()))
+		outputs.clear();
+		targets.reshape(seq.targetClasses.seq_shape(), 0);
+		real_t crossEntropyError = 0;
+		LOOP(int pt, span(seq.targetClasses.seq_size()))
 		{
-			int targetClass = seq.targetClasses[i].front();			
+			int outputClass = output_class(pt);
+			outputs += outputClass;
+			int targetClass = seq.targetClasses[pt].front();
 			if (targetClass >= 0)
 			{
-				View<int> targs = targets[i];	
+				View<int> targs = targets[pt];	
 				targs[targetClass] = 1;
-				View<double> acts = this->outputActivations[i];
-				loop(TDDI t, zip(this->outputErrors[i], acts, targs))
-				{
-					double act = t.get<1>();
-					double targ = t.get<2>();
-					t.get<0>() = -targ/act;
-					if (targ)
-					{
-						crossEntropyError -= targ * log(act/targ);
-					}
-				}
-				int outputClass = max_index(acts);
+				crossEntropyError -= set_error(pt, targetClass);
 				++confusionMatrix[targetClass][outputClass];
 			}
 		}
-		this->errorMap.clear();
-		for (int i = 0; i < confusionMatrix.size(); ++i)
+		errorMap.clear();
+		LOOP (int i, indices(confusionMatrix))
 		{
 			vector<int>& v = confusionMatrix[i];
-			classTargets[i] = sum(v);
-			classErrors[i] = classTargets[i] - v[i];
+			numTargetsByClass[i] = sum(v);
+			numErrorsByClass[i] = numTargetsByClass[i] - v[i];
 		}
-		double numTargets = sum(classTargets);
+		real_t numTargets = sum(numTargetsByClass);
 		if (numTargets)
 		{
-			this->errorMap["crossEntropyError"] = crossEntropyError;
-			this->errorMap["classificationError"] = sum(classErrors) / numTargets;
-			for (int i = 0; i < confusionMatrix.size(); ++i)
+			errorMap["crossEntropyError"] = crossEntropyError;
+			errorMap["classificationError"] = sum(numErrorsByClass) / numTargets;
+			LOOP (int i, indices(confusionMatrix))
 			{
-				if (classTargets[i])
+				if (numTargetsByClass[i])
 				{
-					this->errorMap["_" + labels.left.at(i)] = classErrors[i] / numTargets;
-					if(verbose)
+					errorMap["_" + labels[i]] = numErrorsByClass[i] / numTargets;
+					if(verbose && (confusionMatrix.size() > 2))
 					{
 						vector<int>& v = confusionMatrix[i];
-						for (int j = 0; j < v.size(); ++j)
+						LOOP(int j, indices(v))
 						{
-							if (j != i)
+							if (j != i && v[j])
 							{
-								this->errorMap["_" + labels.left.at(i) + "->" + labels.left.at(j)] = v[j] / numTargets;
+								errorMap["_" + labels[i] + "->" + labels[j]] = v[j] / numTargets;
 							}
 						}
 					}
 				}
 			}
 		}
-		if (verbose)
-		{
-			out << "sorted log probs:" << endl;
-			if (this->num_seq_dims() == 0)
-			{
-				View<LogDouble> logActs = this->logActivations[0];
-				loop (int i, range(this->output_size()))
-				{
-					labelProbs[i] = make_pair(logActs[i].log, i);
-				}
-				reverse_sort(labelProbs);
-				for (int i = 0; i < this->output_size(); ++i)
-				{
-					out << labels.left.at(labelProbs[i].second) << " " << labelProbs[i].first << endl;
-				}
-			}
-		}
 		return crossEntropyError;
 	}
 };
+
+struct MulticlassClassificationLayer: public ClassificationLayer, public SoftmaxLayer
+{
+	//functions
+	MulticlassClassificationLayer(ostream& out, const string& name, size_t numSeqDims, const vector<string>& labels):
+		ClassificationLayer(out, labels),
+		SoftmaxLayer(name, numSeqDims, labels)
+	{
+		//display(targets, "targets", labels);
+	}
+	int output_class(int pt) const
+	{
+		return arg_max(outputActivations[pt]);
+	}
+	real_t class_prob(int pt, int index) const
+	{
+		return max(realMin, outputActivations[pt][index]);
+	}
+	real_t set_error(int pt, int targetClass)
+	{
+		real_t targetProb = class_prob(pt, targetClass);
+		View<real_t> errs  = outputErrors[pt];
+		errs[targetClass] = - (1/targetProb);
+		return log(targetProb);
+	}
+};
+
+struct BinaryClassificationLayer: public ClassificationLayer, public NeuronLayer<Logistic>
+{
+	BinaryClassificationLayer(ostream& out, const string& name, size_t numSeqDims, const vector<string>& labels):
+		ClassificationLayer(out, labels),
+		NeuronLayer<Logistic>(name, numSeqDims, 1)
+	{
+		//display(targets, "targets", labels);
+	}
+	int output_class(int pt) const
+	{
+		return (outputActivations[pt][0] > 0.5 ? 1 : 0);
+	}
+	real_t class_prob(int pt, int index) const
+	{
+		real_t act = max(realMin, outputActivations[pt][0]);
+		return (index == 1 ? act : 1-act);
+	}
+	real_t set_error(int pt, int targetClass)
+	{
+		real_t targetProb = class_prob(pt, targetClass);
+		((View<real_t>&)outputErrors[pt])[0] = (targetClass ? -(1/targetProb) : (1/targetProb));
+		return log(targetProb);
+	}
+};
+
+ClassificationLayer* make_classification_layer(ostream& out, const string& name, size_t numSeqDims, const vector<string>& labels)
+{
+	assert(labels.size() >= 2);
+	if (labels.size() == 2)
+	{
+		return new BinaryClassificationLayer(out, name, numSeqDims, labels);
+	}
+	return new MulticlassClassificationLayer(out, name, numSeqDims, labels);
+}
 
 #endif

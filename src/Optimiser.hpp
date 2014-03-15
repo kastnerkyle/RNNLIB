@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -26,6 +26,16 @@ using namespace std;
 
 struct Optimiser
 {
+	//data
+	vector<real_t>& wts;
+	vector<real_t>& derivs;
+	
+	//functions
+	Optimiser(vector<real_t>& weights, vector<real_t>& derivatives):
+		wts(weights),
+		derivs(derivatives)
+	{
+	}
 	virtual ~Optimiser(){}
 	virtual void update_weights() = 0;
 	virtual void print(ostream& out = cout) const = 0;

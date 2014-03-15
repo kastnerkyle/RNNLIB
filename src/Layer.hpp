@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -18,7 +18,7 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #ifndef _INCLUDED_Layer_h  
 #define _INCLUDED_Layer_h  
 
-#include "list_of.hpp"
+#include <boost/assign/list_of.hpp>
 #include "SeqBuffer.hpp"
 #include "DataExporter.hpp"
 
@@ -26,12 +26,15 @@ extern bool verbose;
 
 struct Layer: public DataExporter
 {
+	//typedefs
+//	typedef multi_array<real_t, 3> array3d;
+	
 	//data
 	vector<int> directions;
-	SeqBuffer<double> inputActivations;
-	SeqBuffer<double> outputActivations;
-	SeqBuffer<double> inputErrors;
-	SeqBuffer<double> outputErrors;
+	SeqBuffer<real_t> inputActivations;
+	SeqBuffer<real_t> outputActivations;
+	SeqBuffer<real_t> inputErrors;
+	SeqBuffer<real_t> outputErrors;
 	Layer* source;
 	
 	//functions
@@ -56,7 +59,7 @@ struct Layer: public DataExporter
 		source(src)
 	{
 		assert(inputSize || outputSize);
-		loop(int d, directions)
+		LOOP(int d, directions)
 		{
 			assert(d == 1 || d == -1);
 		}
@@ -78,6 +81,10 @@ struct Layer: public DataExporter
 	{
 		return outputActivations.seq_shape();
 	}
+	virtual const View<const size_t> input_seq_shape() const
+	{
+		return input_size() ? inputActivations.seq_shape() : output_seq_shape();
+	}
 	virtual SeqIterator output_seq_begin() const
 	{
 		return outputActivations.begin(directions);
@@ -98,7 +105,7 @@ struct Layer: public DataExporter
 		if (directions.size())
 		{
 			out << " (";
-			loop(int d, directions)
+			LOOP(int d, directions)
 			{
 				out << ((d > 0) ? "+" : "-");
 			}
@@ -126,26 +133,30 @@ struct Layer: public DataExporter
 	{
 		assert(source);
 	}
+	virtual void reshape_errors()
+	{
+		inputErrors.reshape(inputActivations, 0);
+		outputErrors.reshape(outputActivations, 0);
+	}
 	virtual void start_sequence()
 	{	
 		assert(!in(source->output_seq_shape(), 0));
 		inputActivations.reshape(source->output_seq_shape(), 0);
-		outputActivations.reshape(source->output_seq_shape(), 0);
-		inputErrors.reshape(source->output_seq_shape(), 0);
-		outputErrors.reshape(source->output_seq_shape(), 0);
+		outputActivations.reshape(source->output_seq_shape(), 0);	
+		reshape_errors();
 	}
-	virtual const View<double> out_acts(const vector<int>& coords)
+	virtual const View<real_t> out_acts(const vector<int>& coords)
 	{
 		return outputActivations[coords];
 	}
-	virtual const View<double> out_errs(const vector<int>& coords)
+	virtual const View<real_t> out_errs(const vector<int>& coords)
 	{
 		return outputErrors[coords];
 	}
 	virtual void feed_forward(const vector<int>& coords){}
 	virtual void feed_back(const vector<int>& coords){}
 	virtual void update_derivs(const vector<int>& coords){}
-	
+	virtual const View<real_t> weights(){return View<real_t>();}
 };
 
 ostream& operator << (ostream& out, const Layer& l)
@@ -153,6 +164,16 @@ ostream& operator << (ostream& out, const Layer& l)
 	l.print(out);
 	return out;
 }
+
+struct FlatLayer: public Layer
+{
+	FlatLayer(const string& name, size_t numSeqDims, size_t size, Layer* src = 0):
+		Layer(name, numSeqDims, size, size, src)
+	{}
+	FlatLayer(const string& name, const vector<int>& dirs, size_t size, Layer* src = 0):
+		Layer(name, dirs, size, size, src)
+	{}
+};
 
 #endif
 

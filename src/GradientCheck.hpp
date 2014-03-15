@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -30,15 +30,17 @@ struct GradientCheck
 	map<string, bool> checked;
 	Mdrnn* net;
 	const DataSequence& seq;
-	double perturbation;
+	real_t perturbation;
 	unsigned sigFigs;
-	vector<double>& weights;
-	vector<double>& derivs;
+	vector<real_t>& weights;
+	vector<real_t>& derivs;
 	bool verbose;
+	bool breakOnError;
 	multimap<string, tuple<string, string, int, int> >& conns;
 				
 	//functions
-	GradientCheck(ostream& o, Mdrnn* n, const DataSequence& s, unsigned sf = 6, double pert = 1e-5, bool verb = false):
+	GradientCheck(ostream& o, Mdrnn* n, const DataSequence& s, unsigned sf = 6, 
+				real_t pert = 1e-5, bool verb = false, bool csd = false, bool boe = true):
 			out(o),
 			net(n),
 			seq(s),
@@ -47,29 +49,40 @@ struct GradientCheck
 			weights(WeightContainer::instance().weights),
 			derivs(WeightContainer::instance().derivatives),
 			verbose(verb),
+			breakOnError(boe),
 			conns(WeightContainer::instance().connections)
 	{		
 		runningGradTest = true;
 		PRINT (perturbation, out);
 		PRINT (sigFigs, out);
 		PRINT (verbose, out);
+		PRINT (breakOnError, out);
 		prt_line(out);
 		out << "calculating algorithmic pds" << endl;
 		net->train(seq);
 		out << "checking against numeric pds" << endl;
-		if (check_layer(net->outputLayer->name))
+		LOOP(Layer* l, net->outputLayers)
 		{
-			out << "GRADIENT CHECK SUCCESSFUL!" << endl;
+			if (!check_layer(l->name))
+			{
+				out << "GRADIENT CHECK FAILED!" << endl << endl;
+				exit(0);
+			}
 		}
-		else
+		LOOP_BACK(Layer* l, net->hiddenLayers)
 		{
-			out << "GRADIENT CHECK FAILED!" << endl;
-			exit(0);
+			if (!check_layer(l->name))
+			{
+				out << "GRADIENT CHECK FAILED!" << endl << endl;
+				exit(0);
+			}
 		}
+		out << "GRADIENT CHECK SUCCESSFUL!" << endl;
 		runningGradTest = false;
 	}
 	bool check_layer(const string& name)
 	{
+		bool retVal = true;
 		if (!checked[name])
 		{
 			checked[name] = true;
@@ -78,23 +91,32 @@ struct GradientCheck
 			{
 				prt_line(out);
 				out << "checking layer " << name << endl;
-			}
-			for (WC_CONN_IT it = range.first; it != range.second; ++it)
-			{
-				if (!check_connection(it->second.get<1>(), it->second.get<2>(), it->second.get<3>()))
+				LOOP (const WC_CONN_PAIR& p, range)
 				{
-					return false;
+					if (!check_connection(p.second.get<1>(), p.second.get<2>(), p.second.get<3>()))
+					{
+						retVal = false;
+						if (breakOnError)
+						{
+							goto exit;
+						}
+					}
 				}
-			}
-			for (WC_CONN_IT it = range.first; it != range.second; ++it)
-			{
-				if (!check_layer(it->second.get<0>()))
+				LOOP (const WC_CONN_PAIR& p, range)
 				{
-					return false;
+					if (!check_layer(p.second.get<0>()))
+					{
+						return false;
+					}
 				}
 			}
 		}
-		return true;
+		exit: 
+		if (!breakOnError && retVal == false)
+		{
+			out << name << ": CHECK FAILED" << endl;
+		}		
+		return retVal;
 	}
 	bool check_connection(const string& name, int begin, int end)
 	{
@@ -103,42 +125,49 @@ struct GradientCheck
 			return true;
 		}
 		out << "checking connection " << name << endl;
-		for (int i = begin; i < end; ++i)
+		bool retVal = true;
+		LOOP(int i, span(begin, end))
 		{
 			//store original weight
-			double oldWt = weights[i];
+			real_t oldWt = weights[i];
 	
 			//add positive perturbation and compute error
 			weights[i] += perturbation;
-			double plusErr = net->calculate_errors(seq);
+			real_t plusErr = net->calculate_errors(seq);
 	
 			//add negative perturbation and compute error
 			weights[i] = oldWt - perturbation;
-			double minusErr = net->calculate_errors(seq);
+			real_t minusErr = net->calculate_errors(seq);
 	
 			//store symmetric difference
-			double numericDeriv = (plusErr-minusErr)/(2*perturbation);
+			real_t numericDeriv = (plusErr-minusErr)/(2*perturbation);
 	
 			//restore original weight
 			weights[i] = oldWt;
 			
-			double algoDeriv = derivs[i];
+			real_t algoDeriv = derivs[i];
 			int index = i - begin;
-			if (verbose)
+			real_t threshold = pow((real_t)10.0, max((real_t)0.0, ceil(log10(min(fabs(algoDeriv), fabs(numericDeriv)))))-(int)sigFigs);
+			real_t diff = fabs(numericDeriv - algoDeriv);
+			bool wrong = (isnan(diff) || diff > threshold);
+			if (verbose || wrong)
 			{
 				out << "weight " << index << " numeric deriv " << numericDeriv << " algorithmic deriv " << algoDeriv << endl;
 			}
-			double threshold = pow(10.0, max(0.0, ceil(log10(min(fabs(algoDeriv), fabs(numericDeriv)))))-(int)sigFigs);
-			if (fabs(numericDeriv - algoDeriv) > threshold)
+			if (wrong)
 			{
-				if(!verbose)
+				retVal = false;
+				if(breakOnError)
 				{
-					out << "weight " << index << " numeric deriv " << numericDeriv << " algorithmic deriv " << algoDeriv << endl;
+					break;
 				}
-				return false;
 			}
 		}
-		return true;
+		if (!breakOnError && retVal == false)
+		{
+			out << name << ": CHECK FAILED" << endl;
+		}	
+		return retVal;
 	}
 };
 

@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -38,11 +38,15 @@ struct FullConnection: public Connection
 	pair<size_t, size_t> paramRange;
 
 	//functions
-	FullConnection(Layer* f, Layer* t, const vector<int>& d = list_of<int>(), FullConnection* s = 0):
+	FullConnection(Layer* f, Layer* t, const vector<int>& d = empty_list_of<int>(), FullConnection* s = 0):
 		Connection(make_name(f, t, d), f, t),
 		source(s),
-		paramRange(source ? source->paramRange : WeightContainer::instance().new_parameters(this->from->output_size() * this->to->input_size(), this->from->name, this->to->name, name))
-	{
+		paramRange(source ? source->paramRange : WeightContainer::instance().new_parameters(this->from->output_size() * this->to->input_size(), this->from->name, this->to->name, name))	{
+		if (source)
+		{
+			WeightContainer::instance().link_layers(this->from->name, this->to->name, this->name, 
+													paramRange.first, paramRange.second);
+		}
 		set_delay(d);
 		assert(num_weights() == (this->from->output_size() * this->to->input_size()));
 		if (this->from->name != "bias" && this->from != this->to && !this->to->source)
@@ -71,17 +75,13 @@ struct FullConnection: public Connection
 		}
 		return name;
 	}
-	const View<double> weights()
+	const View<real_t> weights()
 	{
 		return WeightContainer::instance().get_weights(paramRange);
 	}
-	const View<double> derivs()
+	const View<real_t> derivs()
 	{
 		return WeightContainer::instance().get_derivs(paramRange);
-	}
-	const View<double> plasts()
-	{
-		return WeightContainer::instance().get_plasts(paramRange);
 	}
 	size_t num_weights() const
 	{
@@ -119,7 +119,7 @@ struct FullConnection: public Connection
 	void update_derivs(const vector<int>& toCoords)
 	{
 		const vector<int>* fromCoords = add_delay(toCoords);
-		if (fromCoords)
+		if (fromCoords) 
 		{
 			outer(this->from->out_acts(*fromCoords), derivs().begin(), this->to->inputErrors[toCoords]);
 		}

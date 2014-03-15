@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -21,6 +21,7 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #include <boost/random/uniform_real.hpp>
 #include <boost/random/variate_generator.hpp>
 #include <boost/random/mersenne_twister.hpp>
+#include <boost/random/lagged_fibonacci.hpp>
 #include <boost/random/normal_distribution.hpp>
 #include <boost/date_time.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
@@ -34,12 +35,12 @@ using namespace boost::gregorian;
 typedef mt19937 BaseGenType;
 static BaseGenType generator(42u);
 
-double Random::normal()
+real_t Random::normal()
 {
-	static variate_generator<BaseGenType&, normal_distribution<double> > norm(generator, normal_distribution<double>());
+	static variate_generator<BaseGenType&, normal_distribution<real_t> > norm(generator, normal_distribution<real_t>());
 	return norm();
 }
-double Random::normal(double dev, double mean)
+real_t Random::normal(real_t dev, real_t mean)
 {
 	return (normal() * dev) + mean;
 }
@@ -54,12 +55,12 @@ unsigned int Random::set_seed(unsigned int seed)
 	generator.seed(seed);
 	return seed;
 }
-double Random::uniform(double range)
+real_t Random::uniform(real_t range)
 {
 	return (uniform()*2*range) - range;
 }
-double Random::uniform()
+real_t Random::uniform()
 {
-	static variate_generator<BaseGenType&, uniform_real<double> > uni(generator, uniform_real<double>());
+	static variate_generator<BaseGenType&, uniform_real<real_t> > uni(generator, uniform_real<real_t>());
 	return uni();
 }

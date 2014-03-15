@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -27,16 +27,16 @@ struct CollapseLayer: public Layer
 	vector<size_t> outSeqShape;
 	
 	//functions
-	CollapseLayer(Layer* src, Layer* des, const vector<bool>& activDims = list_of<bool>()):
+	CollapseLayer(Layer* src, Layer* des, const vector<bool>& activDims = empty_list_of<bool>()):
 		Layer(des->name + "_collapse", des->directions, des->input_size(), des->input_size(), src),
 		activeDims(activDims)
 	{
 		activeDims.resize(src->num_seq_dims(), false);
 		assert(count(activDims, true) == des->num_seq_dims());
-		display(this->inputActivations, "inputActivations");
-		display(this->inputErrors, "inputErrors");
-		display(this->outputActivations, "outputActivations");
-		display(this->outputErrors, "outputErrors");
+		DISPLAY(inputActivations);
+		DISPLAY(inputErrors);
+		DISPLAY(outputActivations);
+		DISPLAY(outputErrors);
 	}
 	virtual void start_sequence()
 	{	
@@ -45,14 +45,13 @@ struct CollapseLayer: public Layer
 		{
 			if (activeDims[i])
 			{
-				outSeqShape += this->source->output_seq_shape()[i];
+				outSeqShape += source->output_seq_shape()[i];
 			}
 		}
-		assert(outSeqShape.size() == this->num_seq_dims());
-		this->inputActivations.reshape(this->source->output_seq_shape(), 0);
-		this->inputErrors.reshape(this->source->output_seq_shape(), 0);
-		this->outputActivations.reshape(outSeqShape, 0);
-		this->outputErrors.reshape(outSeqShape, 0);
+		assert(outSeqShape.size() == num_seq_dims());
+		inputActivations.reshape(source->output_seq_shape(), 0);
+		outputActivations.reshape(outSeqShape, 0);
+		reshape_errors();
 	}
 	vector<int> get_out_coords(const vector<int>& inCoords)
 	{
@@ -70,11 +69,11 @@ struct CollapseLayer: public Layer
 	}
 	void feed_forward(const vector<int>& coords)
 	{
-		range_plus_equals(this->outputActivations[get_out_coords(coords)], this->inputActivations[coords]);
+		range_plus_equals(this->outputActivations[get_out_coords(coords)], inputActivations[coords]);
 	}
 	void feed_back(const vector<int>& coords)
 	{
-		copy(this->outputErrors[get_out_coords(coords)], this->inputErrors[coords]);
+		copy(outputErrors[get_out_coords(coords)], inputErrors[coords]);
 	}
 };
 

@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -23,8 +23,8 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 struct BiasLayer: public Layer
 {
 	//data
-	View<double> acts;
-	View<double> errors;
+	View<real_t> acts;
+	View<real_t> errors;
 	
 	//functions
 	BiasLayer():
@@ -35,11 +35,11 @@ struct BiasLayer: public Layer
 		acts.front() = 1;
 	}
 	~BiasLayer(){}
-	const View<double> out_acts(const vector<int>& coords)
+	const View<real_t> out_acts(const vector<int>& coords)
 	{
 		return acts;
 	}
-	const View<double> out_errs(const vector<int>& coords)
+	const View<real_t> out_errs(const vector<int>& coords)
 	{
 		return errors;
 	}

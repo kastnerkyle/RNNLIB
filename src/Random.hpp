@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -18,13 +18,15 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 #ifndef _INCLUDED_Random_h  
 #define _INCLUDED_Random_h  
 
+#include "Helpers.hpp"
+
 namespace Random
 { 
 	unsigned int set_seed(unsigned int seed = 0);
-	double normal();						//normal distribution with mean 0 std dev 1
-	double normal(double dev, double mean = 0);	//normal distribution with user defined mean, dev
-	double uniform(double range);			//uniform real in (-range, range)
-	double uniform();						//uniform real in (0,1)
+	real_t normal();				//normal distribution with mean 0 std dev 1
+	real_t normal(real_t dev, real_t mean = 0);	//normal distribution with user defined mean, dev
+	real_t uniform(real_t range);			//uniform real in (-range, range)
+	real_t uniform();				//uniform real in (0,1)
 };
 
 #endif

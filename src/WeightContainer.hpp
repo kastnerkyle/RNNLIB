@@ -1,4 +1,4 @@
-/*Copyright 2009 Alex Graves
+/*Copyright 2009,2010 Alex Graves
 
 This file is part of RNNLIB.
 
@@ -30,13 +30,13 @@ along with RNNLIB.  If not, see <http://www.gnu.org/licenses/>.*/
 using namespace std;
 
 typedef multimap<string, tuple<string, string, int, int> >::iterator WC_CONN_IT; 
+typedef pair<string, tuple<string, string, int, int> > WC_CONN_PAIR;
 
 struct WeightContainer: public DataExporter
 {
 	//data
-	vector<double> weights;
-	vector<double> derivatives;
-	vector<double> plasticities;
+	Vector<real_t> weights;
+	Vector<real_t> derivatives;
 	multimap<string, tuple<string, string, int, int> > connections;
 	
 	//functions
@@ -49,7 +49,7 @@ struct WeightContainer: public DataExporter
 		static WeightContainer wc;
 		return wc;
 	}
-	void link_layers(const string& fromName, const string& toName, const string& connName = "", int paramBegin = -1, int paramEnd = -1)
+	void link_layers(const string& fromName, const string& toName, const string& connName = "", int paramBegin = 0, int paramEnd = 0)
 	{
 		connections.insert(make_pair(toName, make_tuple(fromName, connName, paramBegin, paramEnd)));
 	}
@@ -61,41 +61,40 @@ struct WeightContainer: public DataExporter
 		link_layers(fromName, toName, connName, begin, end);
 		return make_pair(begin, end);
 	}
-	View<double> get_weights(pair<int, int> range)
+	View<real_t> get_weights(pair<int, int> range)
 	{
-		return View<double>(&weights[range.first], &weights[range.second]);
+		return weights.slice(range);
 	}
-	View<double> get_derivs(pair<int, int> range)
+	View<real_t> get_derivs(pair<int, int> range)
 	{
-		return View<double>(&derivatives[range.first], &derivatives[range.second]);
+		return derivatives.slice(range);
 	}
-	View<double> get_plasts(pair<int, int> range)
+	int randomise(real_t range)
 	{
-		return View<double>(&plasticities[range.first], &plasticities[range.second]);
-	}
-	void randomise(double range)
-	{
-		loop(double& w, weights)
+		int numRandWts = 0;
+		LOOP(real_t& w, weights)
 		{
 			if (w == infinity)
 			{
-				w = Random::normal() * range;
+				w = Random::uniform(range);
+				++numRandWts;
 			}
 		}
+		return numRandWts;
 	}
 	void reset_derivs()
 	{
 		fill(derivatives, 0);
 	}
-	void save_by_conns(vector<double>& container, const string& nam)
+	void save_by_conns(vector<real_t>& container, const string& nam)
 	{
-		for (WC_CONN_IT it = connections.begin(); it != connections.end(); ++it)
+		LOOP(const WC_CONN_PAIR& p, connections)
 		{
-			VDI begin = container.begin() + it->second.get<2>();
-			VDI end = container.begin() + it->second.get<3>();
+			VDI begin = container.begin() + p.second.get<2>();
+			VDI end = container.begin() + p.second.get<3>();
 			if (begin != end)
 			{
-				save_range(make_pair(begin, end), it->second.get<1>() + "_" + nam);
+				save_range(make_pair(begin, end), p.second.get<1>() + "_" + nam);
 			}
 		}
 	}
@@ -103,12 +102,29 @@ struct WeightContainer: public DataExporter
 	void build()
 	{
 		fill(weights, infinity);
-		plasticities.resize(weights.size());
 		derivatives.resize(weights.size());
-		fill(plasticities, 1);
 		save_by_conns(weights, "weights");
-		save_by_conns(plasticities, "plasticities");
+		reset_derivs();
 	}
 };
+void perturb_weight(real_t& weight, real_t stdDev, bool additive = true)
+{
+	weight += Random::normal(fabs(additive ? stdDev : stdDev * weight));
+}
+template <class R> void perturb_weights(R& weights, real_t stdDev, bool additive = true)
+{
+	LOOP(real_t& w, weights)
+	{
+		perturb_weight(w, stdDev, additive);
+	}
+}
+template <class R> void perturb_weights(R& weights, R& stdDevs, bool additive = true)
+{
+	assert(boost::size(weights) == boost::size(stdDevs));
+	LOOP(int i, indices(weights))
+	{
+		perturb_weight(weights[i], stdDevs[i], additive);
+	}
+}
 
 #endif
